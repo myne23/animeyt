@@ -433,7 +433,6 @@ async function fetchEpisodeBlock(info, block) {
 
 async function episodes(ref) {
   const rawRef = String(ref);
-  // "pb|ruta|N" identifica un bloque de 50 episodios dentro de una temporada.
   const blockRef = /^pb\|([^|]+)\|(\d+)$/.exec(rawRef);
   const requestedBlock = blockRef ? parseInt(blockRef[2], 10) : 0;
   let path = blockRef ? blockRef[1] : rawRef.replace(/^[a-z]\|/, "");
@@ -490,7 +489,6 @@ async function episodes(ref) {
   while ((gm = gre.exec(html)) && genres.length < 5) { const g = clean(gm[1]); if (g && !genres.includes(g)) genres.push(g); }
   const series = { title: og("title") || undefined, poster: og("image") || undefined, overview: og("description") || undefined, genres };
 
-  // Temporadas reales: cada una es su propia ficha /tv/ (sección "Saga").
   const base = slug.replace(/-temporada-\d+.*$/, "");
   const seasons = []; const sseen = new Set(); let m;
   const saga = region(html, />\s*Saga\s*</i, /Informaci[oó]n|Reparto/i) || html;
