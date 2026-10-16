@@ -225,13 +225,14 @@ async function home() {
     get("/"), get("/tv/").catch(() => ""), get("/pelicula/").catch(() => ""),
   ]);
   const rows = [];
-  const push = (id, title, items, ref, genre) => { if (items && items.length) rows.push({ id, title, items: items.slice(0, 24), ref, genre }); };
+  const push = (id, title, items, ref, genre, limit) => { if (items && items.length) rows.push({ id, title, items: items.slice(0, limit || 24), ref, genre }); };
 
   const hero = await toItems(parseHero(h));
   push("hero", "En emisión", hero, undefined, "anime");
   const resub = await toItems(parseCards(sectionByHeading(h, "Resubidos")));
   push("resubidos", "Resubidos", resub, undefined, "anime");
-  push("latest", "Últimos episodios", parseLatest(sectionByHeading(h, "Últimos episodios")), undefined, "anime");
+  // La sección de episodios recientes es más larga que las filas de catálogo normales.
+  push("latest", "Últimos episodios", parseLatest(sectionByHeading(h, "Últimos episodios")), undefined, "anime", 60);
   push("explore", "Explorar", await toItems(parseCards(tv)), "b|/tv/", "anime");
   push("movies", "Películas", await toItems(parseCards(mv)), "b|/pelicula/", "peliculas");
   if (!rows.length) throw kino.error("unavailable", "Home vacío: revisar selectores");
@@ -380,9 +381,12 @@ async function episodes(ref) {
     const p = pathOf(attr(m[1], "href")).split("#")[0];
     const mm = /^\/(\d+)\/anime\/([^/]+)\/?$/.exec(p);
     if (!mm || seen.has(p)) continue;
-    const nm = /capitulo-(\d+)(-\d+)?/.exec(mm[2]);
-    if (!nm || nm[2]) continue; // se omiten .5 (recaps) porque number es entero
-    const num = parseInt(nm[1], 10);
+    const nm = /capitulo-(\d+)(?:-(\d+))?/.exec(mm[2]);
+    if (!nm) continue;
+    // AnimeYT codifica episodios .5 como "-5" (por ejemplo, capitulo-13-5).
+    // Otros sufijos pueden indicar episodios dobles; no los convertimos a números falsos.
+    if (nm[2] && nm[2] !== "5") continue;
+    const num = parseInt(nm[1], 10) + (nm[2] === "5" ? 0.5 : 0);
     if (num < 1 || num > 99999) continue;
     seen.add(p);
     const ep = { season: 1, number: num, ref: "e|" + p };
