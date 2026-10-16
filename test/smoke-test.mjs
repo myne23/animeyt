@@ -50,7 +50,12 @@ const kino = {
   },
   error: (c, m) => Object.assign(new Error(m), { code: c }),
   log: () => {}, storage: { get: k => store[k] ?? null, set: (k, v) => { store[k] = v; } },
-  browser: { capture: async () => { throw Object.assign(new Error("x"), { code: "browser_unavailable" }); } },
+  browser: { capture: async (url) => {
+    if (/bysesukior\\.com|mega\\.(?:nz|io)|abyssplayer\\.com/i.test(url)) {
+      return { media: [{ url: "https://cdn.example.test/captured.m3u8", mime: "application/x-mpegURL", headers: { Referer: url } }] };
+    }
+    throw Object.assign(new Error("x"), { code: "browser_unavailable" });
+  } },
 };
 // Kino carga plugin.js como módulo ES: inyectamos el mock global antes de importarlo.
 globalThis.kino = kino;
@@ -101,4 +106,9 @@ eq(longLast.episodes[19].number, 170, "último bloque termina en episodio 170");
 const st = await p.resolve("e|/118225/anime/tensei-temporada-2-capitulo-3/");
 eq(st.url, "https://vd1.okcdn.ru/x.m3u8", "resolve ok.ru HLS");
 console.log("stream:", st.label, st.mime, "alts:", (st.alternatives||[]).length);
+for (const host of ["https://bysesukior.com/e/test", "https://mega.nz/embed/test", "https://player.abyssplayer.com/test"]) {
+  const captured = await p.resolve("v|" + host);
+  eq(captured.url, "https://cdn.example.test/captured.m3u8", "browser capture for " + new URL(host).hostname);
+  eq(captured.mime, "application/x-mpegURL", "browser capture MIME for " + new URL(host).hostname);
+}
 console.log("TODO OK");
