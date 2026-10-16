@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 const card = (slug, t, rt) => `<article><a href="https://animeyt.cc/tv/${slug}/"><img src="" data-src="https://i0.wp.com/animeyt.cc/wp-content/uploads/2026/09/${slug}.jpg?resize=360%2C510&#038;ssl=1" alt="${t}"> ★ ${rt}<span>Donghua</span></a><h3><a href="https://animeyt.cc/tv/${slug}/">${t}</a></h3><p>En emisión · Otoño 2026</p></article>`;
 const pages = {
   "https://animeyt.cc/": `<h2>Tensei <span>Temporada 2</span></h2><a href="/tv/tensei-temporada-2/">Ver ficha</a><img src="https://i0.wp.com/x/h.jpg">
-   <h2>Resubidos</h2>${card("black-clover","Black Clover","8,0")}<h2>Últimos episodios</h2>
-   <a href="https://animeyt.cc/118225/anime/tensei-temporada-2-capitulo-3/"><img src="https://i0.wp.com/a.jpg"> T2 EP 3 HOY</a><h3><a href="https://animeyt.cc/118225/anime/tensei-temporada-2-capitulo-3/">Tensei</a></h3><h2>Programación</h2>
+   <h2>Resubidos</h2>\${card("black-clover","Black Clover","8,0")}<h2>Últimos episodios</h2><section id="ultimos" data-endpoint="/wp-json/aniyt/v1/home/episodes">
+   <article data-episode-id="118225"><a href="https://animeyt.cc/118225/anime/tensei-temporada-2-capitulo-3/"><img src="https://i0.wp.com/a.jpg"> T2 EP 3 HOY</a><h3><a href="https://animeyt.cc/118225/anime/tensei-temporada-2-capitulo-3/">Tensei</a></h3></article></section><h2>Programación</h2>
    <a href="/temporada/otono-2026/">Otoño 2026</a>`,
   "https://animeyt.cc/tv/": card("kyoufu","Kyoufu Collector","8,0")+card("x".repeat(250),"Largo","7,0")+`<a href="/tv/page/2/">2</a>`,
   "https://animeyt.cc/tv/?s=Black%20Clover": card("black-clover","Black Clover","9,6")+card("black-clover-temporada-2","Black Clover","9,5"),
