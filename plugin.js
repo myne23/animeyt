@@ -475,7 +475,8 @@ async function episodes(ref) {
         id: itemId(slug + "-episodes-block-" + b),
         ref: "pb|" + path + "|" + b,
         title: "Capítulos " + bFrom + "-" + bTo + " T" + seasonNo,
-        number: 100 + b,
+        // Ordena los bloques en la posición de su temporada (antes de la siguiente temporada real).
+        number: seasonNo + (b + 1) / 100,
         current: b === blockIndex,
       });
     }
@@ -505,8 +506,12 @@ async function episodes(ref) {
     seasons.push({ id: itemId(s), ref: "s|/tv/" + s + "/", title: "Temporada " + n, number: n, current: s === slug });
   }
   if (blockSelectors.length) {
-    for (const s of seasons) if (s.current) s.current = false;
-    seasons.push(...blockSelectors);
+    // El selector de la temporada actual se reemplaza por sus bloques para evitar duplicados.
+    // Las demás temporadas reales se conservan y los bloques quedan junto a su temporada.
+    const currentSeasonRef = "s|/tv/" + slug + "/";
+    const otherSeasons = seasons.filter((s) => s.ref !== currentSeasonRef);
+    seasons.length = 0;
+    seasons.push(...otherSeasons, ...blockSelectors);
   }
   const res = { series, episodes: list };
   if (seasons.length > 1) res.seasons = seasons.sort((a, b) => a.number - b.number);
