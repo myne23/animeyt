@@ -18,6 +18,23 @@ const pages = {
   "https://mytsumi.com/container.php?id=abc&open=1": `<div data-embed="https://ok.ru/videoembed/123"></div>`,
   "https://ok.ru/videoembed/123": `<div data-options="${JSON.stringify({flashvars:{metadata:JSON.stringify({hlsManifestUrl:"https://vd1.okcdn.ru/x.m3u8",videos:[{name:"hd",url:"https://vd1.okcdn.ru/h.mp4"},{name:"sd",url:"https://vd1.okcdn.ru/s.mp4"}]})}}).replace(/"/g,"&quot;")}"></div>`,
 };
+
+// Simula una ficha larga con 4 bloques remotos (como Black Clover, 170 episodios).
+const episodeCards = (from, to) => {
+  let html = "";
+  for (let n = from; n <= to; n++) {
+    const id = 200000 + n;
+    const slug = "black-clover-capitulo-" + n;
+    html += `<article><a href="/${id}/anime/${slug}/"><img src="data:image/gif;base64,AA==" data-src="https://i0.wp.com/episodes/${n}.jpg"></a><h3><a href="/${id}/anime/${slug}/">Black Clover Capítulo ${n}</a></h3></article>`;
+  }
+  return html;
+};
+pages["https://animeyt.cc/tv/black-clover/"] =
+  `<meta property="og:title" content="Black Clover"><section data-abismo-episode-browser data-anime-id="86" data-blocks="4" data-endpoint="https://animeyt.cc/wp-json/aniyt/v1/anime-episode-browser">${episodeCards(151,170)}</section>`;
+for (const [block, from, to] of [[0,1,50],[1,51,100],[2,101,150],[3,151,170]]) {
+  pages[`https://animeyt.cc/wp-json/aniyt/v1/anime-episode-browser?anime_id=86&block=${block}&order=ASC`] =
+    JSON.stringify({ html: episodeCards(from,to), count: to-from+1 });
+}
 const store = {};
 const kino = {
   fetch: async (u) => { const t = pages[u] ?? pages[u.replace(/\?.*/, "")]; if (t === undefined) return { ok:false, status:404, text:()=>"" }; return { ok:true, status:200, url:u, text:()=>t }; },
@@ -51,6 +68,11 @@ eq(ep.episodes.map(e => e.number), [1, 3, 13.5], "episodios incluyen .5 y quedan
 eq(ep.seasons.map(s => s.title), ["Temporada 1", "Temporada 2"], "seasons");
 eq(ep.seasons.find(s=>s.current).ref, "s|/tv/tensei-temporada-2/", "season current");
 const ep2 = await p.episodes("x|/118225/anime/tensei-temporada-2-capitulo-3/"); eq(ep2.episodes.length, 3, "x| delega a serie e conserva episodios .5");
+const long = await p.episodes("s|/tv/black-clover/");
+eq(long.episodes.length, 170, "ficha larga recupera los 4 bloques completos sin duplicados");
+eq(long.episodes[0].number, 1, "episodios de ficha larga ordenados desde el 1");
+eq(long.episodes[169].number, 170, "episodio final de ficha larga");
+eq(long.episodes[0].still, "https://i0.wp.com/episodes/1.jpg", "miniatura data-src conservada en bloque remoto");
 const st = await p.resolve("e|/118225/anime/tensei-temporada-2-capitulo-3/");
 eq(st.url, "https://vd1.okcdn.ru/x.m3u8", "resolve ok.ru HLS");
 console.log("stream:", st.label, st.mime, "alts:", (st.alternatives||[]).length);
