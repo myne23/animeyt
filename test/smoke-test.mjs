@@ -1,6 +1,5 @@
 // Prueba de humo con respuestas simuladas. Valida lógica y sintaxis, NO el sitio real.
 import { readFileSync } from "node:fs";
-import vm from "node:vm";
 const card = (slug, t, rt) => `<article><a href="https://animeyt.cc/tv/${slug}/"><img src="" data-src="https://i0.wp.com/animeyt.cc/wp-content/uploads/2026/09/${slug}.jpg?resize=360%2C510&#038;ssl=1" alt="${t}"> ★ ${rt}<span>Donghua</span></a><h3><a href="https://animeyt.cc/tv/${slug}/">${t}</a></h3><p>En emisión · Otoño 2026</p></article>`;
 const pages = {
   "https://animeyt.cc/": `<h2>Tensei <span>Temporada 2</span></h2><a href="/tv/tensei-temporada-2/">Ver ficha</a><img src="https://i0.wp.com/x/h.jpg">
@@ -25,10 +24,10 @@ const kino = {
   log: () => {}, storage: { get: k => store[k] ?? null, set: (k, v) => { store[k] = v; } },
   browser: { capture: async () => { throw Object.assign(new Error("x"), { code: "browser_unavailable" }); } },
 };
-const ctx = { kino, console, URL, module: { exports: {} }, globalThis: {} };
-ctx.globalThis = ctx; vm.createContext(ctx);
-vm.runInContext(readFileSync(new URL("../plugin.js", import.meta.url), "utf8"), ctx);
-const p = ctx.module.exports;
+// Kino ejecuta plugin.js como módulo ES: inyectamos el mock global antes de importarlo.
+globalThis.kino = kino;
+const source = readFileSync(new URL("../plugin.js", import.meta.url), "utf8");
+const p = await import("data:text/javascript;base64," + Buffer.from(source).toString("base64"));
 const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.error("FAIL", m, JSON.stringify(a), "!=", JSON.stringify(b)); process.exit(1); } };
 
 const rows = await p.home();
