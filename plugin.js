@@ -156,6 +156,22 @@ function region(html, startRe, endRe) {
   return e < 0 ? rest : rest.slice(0, e + 10);
 }
 
+// Extrae una sección por su encabezado real, no por el primer enlace del menú.
+// Conserva los h3 de cada tarjeta y termina al llegar al siguiente encabezado de igual
+// o mayor nivel (por ejemplo, de "Últimos episodios" a "Programación").
+function sectionByHeading(html, label) {
+  const re = /<h([1-6])\b[^>]*>[\s\S]*?<\/h\1>/gi;
+  const headings = [];
+  let m;
+  while ((m = re.exec(html))) headings.push({ level: Number(m[1]), start: m.index, end: re.lastIndex, text: clean(m[0]) });
+  const normalize = (v) => String(v).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const wanted = normalize(label);
+  const heading = headings.find((h) => normalize(h.text).includes(wanted));
+  if (!heading) return "";
+  const next = headings.find((h) => h.start > heading.start && h.level <= heading.level);
+  return html.slice(heading.end, next ? next.start : html.length);
+}
+
 function lookBackHeading(html, idx) {
   const win = html.slice(Math.max(0, idx - 2500), idx);
   const hs = win.match(/<h[1-3][^>]*>[\s\S]*?<\/h[1-3]>/gi);
@@ -186,17 +202,18 @@ function parseLatest(html) {
   const hre = /<h[1-4][^>]*>\s*<a\b([^>]*)>([\s\S]*?)<\/a>/gi; let hm;
   while ((hm = hre.exec(html))) titles.set(pathOf(attr(hm[1], "href")), clean(hm[2]));
   while ((m = ANCHOR.exec(html))) {
-    const p = pathOf(attr(m[1], "href"));
+    const p = pathOf(attr(m[1], "href")).split("#")[0];
     const mm = /^\/(\d+)\/anime\/([^/]+)\/?$/.exec(p);
     if (!mm || seen.has(mm[1])) continue;
     const img = firstImg(m[2]);
     if (!img) continue;
     seen.add(mm[1]);
-    const slug = mm[2].replace(/-capitulo-\d+(?:-\d+)?(?:-\d{4})?$/, "");
     const label = clean(m[2]).replace(/\s+/g, " ");
+    const title = titles.get(p) || humanize(mm[2].replace(/-capitulo-\d+(?:-\d+)?(?:-\d{4})?$/, ""));
+    // ID por episodio, no por serie: dos capítulos de la misma serie deben ser tarjetas distintas.
     out.push({
-      id: itemId("ep-" + slug), ref: "x|" + p.split("#")[0],
-      title: titles.get(p) || humanize(slug), kind: "series", poster: posterOf(img), backdrop: posterOf(img),
+      id: itemId("ep-" + mm[1]), ref: "x|" + p,
+      title, kind: "series", poster: posterOf(img), backdrop: posterOf(img),
       badges: badgesOf(label).concat(/(T\d+\s*)?EP\s*[\d.]+/i.test(label) ? [(/(T\d+\s*)?EP\s*[\d.]+/i.exec(label) || [""])[0].trim()] : []).slice(0, 3),
     });
   }
@@ -212,9 +229,9 @@ async function home() {
 
   const hero = await toItems(parseHero(h));
   push("hero", "En emisión", hero, undefined, "anime");
-  const resub = await toItems(parseCards(region(h, /Resubidos/i, /Últimos episodios|id=["']ultimos/i)));
+  const resub = await toItems(parseCards(sectionByHeading(h, "Resubidos")));
   push("resubidos", "Resubidos", resub, undefined, "anime");
-  push("latest", "Últimos episodios", parseLatest(region(h, /Últimos episodios/i, /Programaci/i)), undefined, "anime");
+  push("latest", "Últimos episodios", parseLatest(sectionByHeading(h, "Últimos episodios")), undefined, "anime");
   push("explore", "Explorar", await toItems(parseCards(tv)), "b|/tv/", "anime");
   push("movies", "Películas", await toItems(parseCards(mv)), "b|/pelicula/", "peliculas");
   if (!rows.length) throw kino.error("unavailable", "Home vacío: revisar selectores");
@@ -256,6 +273,31 @@ async function categories() {
 }
 
 // ---------- búsqueda ----------
+function dedupeSearchCards(cards) {
+  const seen = new Set();
+  return cards.filter((c) => {
+    const key = c.kindPath + "|" + c.slug;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function labelSeasonDuplicates(cards) {
+  const counts = new Map();
+  for (const c of cards) {
+    const key = clean(c.title).toLocaleLowerCase();
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return cards.map((c) => {
+    if ((counts.get(clean(c.title).toLocaleLowerCase()) || 0) < 2) return c;
+    const match = /(?:-temporada-(\d+)|-t(\d+))(?:-|$)/i.exec(c.slug);
+    if (!match || /temporada\s*\d+/i.test(c.title)) return c;
+    const n = Number(match[1] || match[2]);
+    return Object.assign({}, c, { title: c.title + " Temporada " + n });
+  });
+}
+
 async function search(q) {
   const text = String(q.q || "").trim();
   if (!text) return [];
@@ -277,9 +319,10 @@ async function search(q) {
     if (same) continue;
     const ok = relevant(r.cards.map((c) => ({ title: c.title, c }))).map((x) => x.c);
     if (ok.length) {
+      const labeled = labelSeasonDuplicates(dedupeSearchCards(ok));
       try { kino.storage.set("sk", r.t.k); } catch (e) {}
-      log("search param", r.t.k, ok.length);
-      return await toItems(sorted(ok.map((c) => Object.assign({ title: c.title }, c))));
+      log("search param", r.t.k, labeled.length);
+      return await toItems(sorted(labeled.map((c) => Object.assign({ title: c.title }, c))));
     }
   }
 
