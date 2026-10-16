@@ -432,7 +432,11 @@ async function fetchEpisodeBlock(info, block) {
 }
 
 async function episodes(ref) {
-  let path = String(ref).replace(/^[a-z]\|/, "");
+  const rawRef = String(ref);
+  // "pb|ruta|N" identifica un bloque de 50 episodios dentro de una temporada.
+  const blockRef = /^pb\|([^|]+)\|(\d+)$/.exec(rawRef);
+  const requestedBlock = blockRef ? parseInt(blockRef[2], 10) : 0;
+  let path = blockRef ? blockRef[1] : rawRef.replace(/^[a-z]\|/, "");
   if (/^x\|/.test(ref) || /^\/\d+\/anime\//.test(path)) {
     const eh = await get(path);
     const m = /href=["'](?:https?:\/\/animeyt\.cc)?(\/tv\/[^"'#?]+\/?)/i.exec(eh);
@@ -443,36 +447,50 @@ async function episodes(ref) {
   const slug = slugOfPath(path);
   const initial = parseEpisodeCards(html);
   let eps = initial;
-
-  // Las fichas largas cargan los demás bloques mediante el navegador de episodios Abismo.
-  // Si el endpoint falla, conservamos los episodios del HTML inicial.
   const info = episodeBrowserInfo(html);
-  if (info && info.blocks > 0) {
-    const started = Date.now();
-    const all = [];
-    for (let from = 0; from < info.blocks && Date.now() - started < 20000; from += 6) {
-      const batch = [];
-      for (let b = from; b < Math.min(from + 6, info.blocks); b++) batch.push(b);
-      const results = await Promise.all(batch.map((b) => fetchEpisodeBlock(info, b)));
-      all.push(...results.flat());
-    }
+  const seasonMatch = /-temporada-(\d+)/i.exec(slug);
+  const seasonNo = seasonMatch ? parseInt(seasonMatch[1], 10) : 1;
+  let blockSelectors = [];
+
+  // Solicita solo el bloque elegido: 50 episodios por vista.
+  if (info && info.blocks > 1) {
+    const blockIndex = Math.min(Math.max(0, requestedBlock), info.blocks - 1);
+    const from = blockIndex * 50 + 1;
+    const knownLast = initial.reduce((max, ep) => Math.max(max, ep.number), 0);
+    const estimatedTotal = knownLast > (info.blocks - 1) * 50 ? knownLast : info.blocks * 50;
+    const to = blockIndex === info.blocks - 1 ? estimatedTotal : (blockIndex + 1) * 50;
+    const all = await fetchEpisodeBlock(info, blockIndex);
     if (all.length) {
-      eps = mergeEpisodeLists(initial, all);
-      log("episode browser", slug, "bloques", info.blocks, "iniciales", initial.length, "recuperados", all.length, "únicos", eps.length);
+      eps = all.filter((ep) => ep.number >= from && ep.number <= to);
+    } else if (blockIndex === info.blocks - 1) {
+      eps = initial.filter((ep) => ep.number >= from && ep.number <= to);
     } else {
-      log("episode browser sin resultados; uso HTML inicial", slug, initial.length);
+      eps = [];
+    }
+    log("episode browser", slug, "bloque", blockIndex, "rango", from + "-" + to, "recuperados", eps.length);
+
+    for (let b = 0; b < info.blocks; b++) {
+      const bFrom = b * 50 + 1;
+      const bTo = b === info.blocks - 1 ? estimatedTotal : (b + 1) * 50;
+      blockSelectors.push({
+        id: itemId(slug + "-episodes-block-" + b),
+        ref: "pb|" + path + "|" + b,
+        title: "Capítulos " + bFrom + "-" + bTo + " T" + seasonNo,
+        number: 100 + b,
+        current: b === blockIndex,
+      });
     }
   }
 
   const list = mergeEpisodeLists(eps);
-  if (!list.length) throw kino.error("not_found", "Sin episodios publicados");
+  if (!list.length) throw kino.error("not_found", "Sin episodios publicados en este bloque");
 
   const og = (n) => { const r = new RegExp("<meta[^>]+property=[\"']og:" + n + "[\"'][^>]*content=[\"']([^\"']*)", "i").exec(html) || new RegExp("<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+property=[\"']og:" + n + "[\"']", "i").exec(html); return r ? dec(r[1]) : ""; };
   const genres = []; const gre = /\/genres\/[^"']+["'][^>]*>([^<]+)</gi; let gm;
   while ((gm = gre.exec(html)) && genres.length < 5) { const g = clean(gm[1]); if (g && !genres.includes(g)) genres.push(g); }
   const series = { title: og("title") || undefined, poster: og("image") || undefined, overview: og("description") || undefined, genres };
 
-  // temporadas: cada una es su propia ficha /tv/ (sección "Saga")
+  // Temporadas reales: cada una es su propia ficha /tv/ (sección "Saga").
   const base = slug.replace(/-temporada-\d+.*$/, "");
   const seasons = []; const sseen = new Set(); let m;
   const saga = region(html, />\s*Saga\s*</i, /Informaci[oó]n|Reparto/i) || html;
@@ -488,11 +506,14 @@ async function episodes(ref) {
     const n = tn ? parseInt(tn[1], 10) : 1;
     seasons.push({ id: itemId(s), ref: "s|/tv/" + s + "/", title: "Temporada " + n, number: n, current: s === slug });
   }
+  if (blockSelectors.length) {
+    for (const s of seasons) if (s.current) s.current = false;
+    seasons.push(...blockSelectors);
+  }
   const res = { series, episodes: list };
   if (seasons.length > 1) res.seasons = seasons.sort((a, b) => a.number - b.number);
   return res;
 }
-
 // ---------- resolutores ----------
 const MEDIA_RE = /https?:\\?\/\\?\/[^\s"'<>\\)]+?\.(?:m3u8|mp4|mpd)(?:\?[^\s"'<>\\)]*)?/gi;
 const mimeOf = (u) => (/\.m3u8/i.test(u) ? "application/x-mpegURL" : /\.mpd/i.test(u) ? "application/dash+xml" : "video/mp4");
