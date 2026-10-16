@@ -28,7 +28,7 @@ La prueba `node test/smoke-test.mjs` usa HTML simulado: comprueba parte de la l�
 
 ## Instalación para pruebas
 
-En Kino, agregá el repositorio `myne23/animeyt` desde Ajustes → Plugins.
+En Kino, agregá `myne23/animeyt@test-animeyt` desde Ajustes → Plugins para instalar esta rama de pruebas. No uses `myne23/animeyt` a secas, porque eso instala la rama principal (`main`).
 
 Este repositorio es independiente. **No copies estos archivos encima de DonghuaLife ni de los demás plugins.** Los cambios experimentales deben probarse en una rama separada antes de llevarlos a `main`.
 
