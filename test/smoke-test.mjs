@@ -51,7 +51,7 @@ const kino = {
   error: (c, m) => Object.assign(new Error(m), { code: c }),
   log: () => {}, storage: { get: k => store[k] ?? null, set: (k, v) => { store[k] = v; } },
   browser: { capture: async (url) => {
-    if (/bysesukior\\.com|mega\\.(?:nz|io)|abyssplayer\\.com/i.test(url)) {
+    if (/bysesukior\.com|mega\.(?:nz|io)|abyssplayer\.com/i.test(url)) {
       return { media: [{ url: "https://cdn.example.test/captured.m3u8", mime: "application/x-mpegURL", headers: { Referer: url } }] };
     }
     throw Object.assign(new Error("x"), { code: "browser_unavailable" });
