@@ -1,37 +1,40 @@
 # AnimeYT para Kino
 
-Plugin (apiVersion 6) para https://animeyt.cc — anime, donghua y películas sub español.
+Plugin de Kino (API 6) para https://animeyt.cc — anime, donghua y películas en español.
 
-## Estado: BASE sin probar en la app
-Hecho a partir de análisis del sitio sin poder ejecutar red desde el entorno de desarrollo.
-`node test/smoke-test.mjs` valida la lógica con HTML simulado, **no** los selectores reales.
+## Estado
 
-## Qué hace
-- `home`: En emisión (hero), Resubidos, Últimos episodios, Explorar, Películas.
-- `browse`: paginación `/tv/page/N/` (+ `?tipo=ova|ona|especial|musical`), `categories`.
-- `search`: prueba en paralelo parámetros del buscador (`q`, `buscar`, `search`, `busqueda`, `s`),
-  valida que filtren y guarda el que funcione. Respaldo: índice local de `/tv/page/N/` (se completa en
-  varias búsquedas). Si descubrís el parámetro real, ponelo en `SEARCH_PARAM_HINT`.
-- `episodes`: cada temporada es una ficha `/tv/` propia → se exponen como `seasons` (sección "Saga").
-  Se omiten episodios decimales (13.5, recaps) porque `number` es entero.
-- `resolve`: episodio → iframe `mytsumi.com/container.php?id=…` → lee el contenedor (HTML, scripts,
-  endpoints) → resolutor directo (OK.ru implementado) → genérico (m3u8/mp4, packer) →
-  **último recurso** `kino.browser.capture`. Otros servidores quedan como alternativas ("Servidor").
-- Series 18+ (géneros hentai/erótica) se marcan `adult`.
+**Base inicial, todavía sin validar contra AnimeYT real ni probar en la app.**
 
-## Qué falta confirmar en la app (mirá `logcat` → KinoPlugin/animeyt, `debug: true`)
-1. Búsqueda: línea `search param X`. Si no aparece, usa el índice local.
-2. Resolve: el contenedor de mytsumi carga los servidores (Byse, Alpha, MEGA, OK, Epsilon, Abyss) por JS.
-   Los logs `container html`, `endpoints` y `endpoint resp` muestran qué encontró. Con la URL real del
-   endpoint se agrega al flujo en `containerSources()`.
-3. Hosts: el `url` de un Stream debe estar en `hosts` de `kino-plugin.json`. Si el log dice `ok <host>`
-   pero no reproduce, agregá el dominio del CDN (y `*.dominio`).
-4. Byse/Alpha/Epsilon/Abyss necesitan resolutor propio (agregar en `resolveEmbed`). MEGA no es reproducible.
-5. Episodios en "bloques de 50": si series largas muestran solo 50, falta el parámetro de bloque.
+La prueba `node test/smoke-test.mjs` usa HTML simulado: comprueba parte de la lógica, pero no confirma que los selectores, la búsqueda o la reproducción funcionen en el sitio actual.
 
-Antes de publicar: quitar `"debug": true`.
+## Funciones incluidas
 
-## Instalar
-Copiá estos archivos a un repo generado desde `kinotvapp/kino-plugin-archive` (o sobre el de DonghuaLife,
-reemplazando `plugin.js`, `kino-plugin.json`, `icon.png`), y en Kino: Ajustes → Plugins → `usuario/repo`.
-Validar: `node sdk/validate.mjs .` y `node sdk/run.mjs ./plugin.js home`.
+- `home`: filas de En emisión, Resubidos, Últimos episodios, Explorar y Películas.
+- `browse`: catálogo con paginación y categorías para TV, OVA, ONA y especiales.
+- `search`: intenta descubrir el parámetro real de búsqueda y tiene un índice local como alternativa.
+- `episodes`: extrae episodios y temporadas enlazadas desde las fichas de serie.
+- `resolve`: examina el iframe de `mytsumi.com/container.php`, intenta resolver OK.ru y fuentes multimedia directas y deja la captura del navegador de Kino como último recurso.
+- Las fichas detectadas como hentai/eróticas se marcan como contenido para adultos.
+
+## Pendiente de comprobar
+
+1. **Búsqueda real:** confirmar que devuelve resultados relevantes y no el catálogo completo.
+2. **Catálogo y episodios:** probar fichas reales, temporadas múltiples y series largas; todavía no se conoce el comportamiento de todas las páginas.
+3. **Reproducción:** OK.ru tiene un resolutor dedicado. Byse, Alpha, Epsilon y Abyss todavía necesitan investigación y/o resolutores propios; MEGA no está implementado.
+4. **Hosts de vídeo:** si una fuente se resuelve pero Kino la rechaza, revisar el dominio CDN y declararlo en `kino-plugin.json` cuando corresponda.
+5. **Validación:** usar el SDK incluido para ejecutar `node sdk/validate.mjs .` y `node sdk/run.mjs ./plugin.js home`, además de `node test/smoke-test.mjs`.
+6. **Depuración:** `debug: true` se conserva durante las pruebas para facilitar el diagnóstico; revisarlo antes de una publicación estable.
+
+## Instalación para pruebas
+
+En Kino, agregá el repositorio `myne23/animeyt` desde Ajustes → Plugins.
+
+Este repositorio es independiente. **No copies estos archivos encima de DonghuaLife ni de los demás plugins.** Los cambios experimentales deben probarse en una rama separada antes de llevarlos a `main`.
+
+## Desarrollo
+
+- Manifiesto: `kino-plugin.json`
+- Código: `plugin.js`
+- Contrato y declaraciones del SDK: `contract.json`, `kino.d.ts`, `sdk/`
+- Prueba simulada: `test/smoke-test.mjs`
