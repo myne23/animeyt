@@ -467,7 +467,7 @@ async function episodes(ref) {
   const list = mergeEpisodeLists(eps);
   if (!list.length) throw kino.error("not_found", "Sin episodios publicados");
 
-  const og = (n) => { const r = new RegExp("<meta[^>]+property=[\\"']og:" + n + "[\\"'][^>]*content=[\\"']([^\\"']*)", "i").exec(html) || new RegExp("<meta[^>]+content=[\\"']([^\\"']*)[\\"'][^>]+property=[\\"']og:" + n + "[\\"']", "i").exec(html); return r ? dec(r[1]) : ""; };
+  const og = (n) => { const r = new RegExp("<meta[^>]+property=[\"']og:" + n + "[\"'][^>]*content=[\"']([^\"']*)", "i").exec(html) || new RegExp("<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+property=[\"']og:" + n + "[\"']", "i").exec(html); return r ? dec(r[1]) : ""; };
   const genres = []; const gre = /\/genres\/[^"']+["'][^>]*>([^<]+)</gi; let gm;
   while ((gm = gre.exec(html)) && genres.length < 5) { const g = clean(gm[1]); if (g && !genres.includes(g)) genres.push(g); }
   const series = { title: og("title") || undefined, poster: og("image") || undefined, overview: og("description") || undefined, genres };
