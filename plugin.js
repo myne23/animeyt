@@ -474,7 +474,7 @@ async function episodes(ref) {
 
   // temporadas: cada una es su propia ficha /tv/ (sección "Saga")
   const base = slug.replace(/-temporada-\d+.*$/, "");
-  const seasons = []; const sseen = new Set();
+  const seasons = []; const sseen = new Set(); let m;
   const saga = region(html, />\s*Saga\s*</i, /Informaci[oó]n|Reparto/i) || html;
   ANCHOR.lastIndex = 0;
   while ((m = ANCHOR.exec(saga))) {
