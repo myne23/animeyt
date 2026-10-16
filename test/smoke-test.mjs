@@ -37,7 +37,15 @@ for (const [block, from, to] of [[0,1,50],[1,51,100],[2,101,150],[3,151,170]]) {
 }
 const store = {};
 const kino = {
-  fetch: async (u) => { const t = pages[u] ?? pages[u.replace(/\?.*/, "")]; if (t === undefined) return { ok:false, status:404, text:()=>"" }; return { ok:true, status:200, url:u, text:()=>t }; },
+  fetch: async (u) => {
+    if (u.startsWith("https://animeyt.cc/wp-json/aniyt/v1/home/episodes?")) {
+      const html = \`<article data-episode-id="118226"><a href="/118226/anime/tensei-temporada-2-capitulo-2/"><img src="data:image/svg+xml;base64,AA==" data-src="https://i0.wp.com/a2.jpg"> T2 EP 2</a><h3><a href="/118226/anime/tensei-temporada-2-capitulo-2/">Tensei</a></h3></article><article data-episode-id="118227"><a href="/118227/anime/tensei-temporada-2-capitulo-1/"><img data-src="https://i0.wp.com/a1.jpg"> T2 EP 1</a><h3><a href="/118227/anime/tensei-temporada-2-capitulo-1/">Tensei</a></h3></article>\`;
+      return { ok:true, status:200, url:u, text:()=>JSON.stringify({html,ids:["118226","118227"],has_more:false}) };
+    }
+    const t = pages[u] ?? pages[u.replace(/\?.*/, "")];
+    if (t === undefined) return { ok:false, status:404, text:()=>"" };
+    return { ok:true, status:200, url:u, text:()=>t };
+  },
   error: (c, m) => Object.assign(new Error(m), { code: c }),
   log: () => {}, storage: { get: k => store[k] ?? null, set: (k, v) => { store[k] = v; } },
   browser: { capture: async () => { throw Object.assign(new Error("x"), { code: "browser_unavailable" }); } },
@@ -58,6 +66,9 @@ const latest = rows.find(r => r.id === "latest");
 eq(!!latest, true, "latest section present");
 eq(latest.items[0].poster, "https://i0.wp.com/a.jpg", "latest episode thumbnail preserved");
 eq(latest.items[0].id, "ep-118225", "latest item has unique episode id");
+eq(latest.items.length, 3, "latest endpoint adds more episodes");
+eq(latest.items[1].id, "ep-118226", "additional episodes preserve server order");
+eq(latest.items[1].poster, "https://i0.wp.com/a2.jpg", "additional episode uses data-src thumbnail");
 const found = await p.search({ q: "Black Clover" });
 eq(found.length, 2, "search returns both original and season");
 eq(found.find(x => x.ref.includes("black-clover-temporada-2")).title, "Black Clover Temporada 2", "season search title disambiguated");
