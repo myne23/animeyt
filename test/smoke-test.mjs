@@ -50,7 +50,7 @@ const ep = await p.episodes("s|/tv/tensei-temporada-2/");
 eq(ep.episodes.map(e => e.number), [1, 3, 13.5], "episodios incluyen .5 y quedan ordenados");
 eq(ep.seasons.map(s => s.title), ["Temporada 1", "Temporada 2"], "seasons");
 eq(ep.seasons.find(s=>s.current).ref, "s|/tv/tensei-temporada-2/", "season current");
-const ep2 = await p.episodes("x|/118225/anime/tensei-temporada-2-capitulo-3/"); eq(ep2.episodes.length, 2, "x| delega a serie");
+const ep2 = await p.episodes("x|/118225/anime/tensei-temporada-2-capitulo-3/"); eq(ep2.episodes.length, 3, "x| delega a serie e conserva episodios .5");
 const st = await p.resolve("e|/118225/anime/tensei-temporada-2-capitulo-3/");
 eq(st.url, "https://vd1.okcdn.ru/x.m3u8", "resolve ok.ru HLS");
 console.log("stream:", st.label, st.mime, "alts:", (st.alternatives||[]).length);
