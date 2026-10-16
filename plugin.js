@@ -219,69 +219,6 @@ function parseLatest(html) {
   return out;
 }
 
-// IDs usados por "Cargar más episodios": prioriza data-episode-id y usa la URL
-// como respaldo para tarjetas iniciales cuyo HTML no incluye el atributo.
-function latestEpisodeIds(html) {
-  const ids = new Set();
-  const article = /<article\b[^>]*>[\s\S]*?<\/article>/gi; let m;
-  while ((m = article.exec(html))) {
-    const tag = /^<article\b[^>]*>/i.exec(m[0]);
-    const id = tag && attr(tag[0], "data-episode-id");
-    if (id) ids.add(String(id));
-  }
-  let a; ANCHOR.lastIndex = 0;
-  while ((a = ANCHOR.exec(html))) {
-    const p = pathOf(attr(a[1], "href")).split("#")[0];
-    const mm = /^\/(\d+)\/anime\/([^/]+)\/?$/.exec(p);
-    if (mm) ids.add(mm[1]);
-  }
-  return ids;
-}
-
-function latestEndpoint(html) {
-  const section = /<section\b(?=[^>]*\bid=["']ultimos["'])[^>]*>/i.exec(html);
-  return section ? attr(section[0], "data-endpoint") : "";
-}
-
-async function loadMoreLatest(html, initialItems) {
-  const endpoint = latestEndpoint(html);
-  if (!endpoint) return initialItems;
-  const ids = latestEpisodeIds(html);
-  const items = initialItems.slice();
-  const seenItems = new Set(items.map((it) => it.id));
-  const maxBatches = 10; // hasta 300 episodios adicionales, con límite contra bucles.
-  for (let batch = 0; batch < maxBatches; batch++) {
-    if (!ids.size) break;
-    const url = new URL(absUrl(endpoint), BASE + "/");
-    url.searchParams.set("limit", "30");
-    url.searchParams.set("exclude", [...ids].join(","));
-    let data;
-    try {
-      const raw = await get(url.toString(), { timeoutMs: 9000, headers: { Accept: "application/json" } });
-      data = JSON.parse(raw);
-    } catch (e) {
-      log("Últimos episodios: endpoint adicional falló", String((e && e.message) || e));
-      break;
-    }
-    if (!data || typeof data.html !== "string") break;
-    const returnedIds = latestEpisodeIds(data.html);
-    if (Array.isArray(data.ids)) data.ids.forEach((id) => returnedIds.add(String(id)));
-    let added = 0;
-    for (const id of returnedIds) {
-      if (!ids.has(id)) { ids.add(id); added++; }
-    }
-    const parsed = parseLatest(data.html);
-    for (const item of parsed) {
-      if (!seenItems.has(item.id)) {
-        seenItems.add(item.id);
-        items.push(item);
-      }
-    }
-    if (data.has_more === false || added === 0 || !parsed.length) break;
-  }
-  return items;
-}
-
 async function home() {
   const [h, tv, mv] = await Promise.all([
     get("/"), get("/tv/").catch(() => ""), get("/pelicula/").catch(() => ""),
@@ -293,10 +230,9 @@ async function home() {
   push("hero", "En emisión", hero, undefined, "anime");
   const resub = await toItems(parseCards(sectionByHeading(h, "Resubidos")));
   push("resubidos", "Resubidos", resub, undefined, "anime");
-  // La sección de episodios recientes es más larga que las filas de catálogo normales.
+  // Mantener la home rápida: usamos solo los episodios que ya vienen en el HTML inicial.
   const latestHtml = sectionByHeading(h, "Últimos episodios");
-  const latestItems = await loadMoreLatest(h, parseLatest(latestHtml));
-  push("latest", "Últimos episodios", latestItems, undefined, "anime", 330);
+  push("latest", "Últimos episodios", parseLatest(latestHtml), undefined, "anime", 30);
   push("explore", "Explorar", await toItems(parseCards(tv)), "b|/tv/", "anime");
   push("movies", "Películas", await toItems(parseCards(mv)), "b|/pelicula/", "peliculas");
   if (!rows.length) throw kino.error("unavailable", "Home vacío: revisar selectores");
@@ -607,7 +543,16 @@ function unpackAll(text) {
 function harvest(text) {
   const t = unesc(text);
   const all = t + "\n" + unpackAll(t).join("\n");
-  const media = [...new Set((all.match(MEDIA_RE) || []).map((u) => unesc(u)))];
+  // Algunos hostings publican URL que terminan en .mp4 pero responden con HTML de descarga.
+  // No son medios directos y provocan parsing_container_unsupported en Kino.
+  const media = [...new Set((all.match(MEDIA_RE) || []).map((u) => unesc(u)))].filter((u) => {
+    const host = hostOf(u);
+    let path = "";
+    try { path = new URL(u).pathname; } catch (e) {}
+    if (/^mediafire\.com$/i.test(host) && /^\/file\//i.test(path)) return false;
+    if (/^fireload\.com$/i.test(host) && /^\/[a-f0-9]{12,}\//i.test(path)) return false;
+    return true;
+  });
   const urls = [...new Set((all.match(/https?:\/\/[^\s"'<>\\)]+/g) || []).map(unesc))];
   const embeds = urls.filter((u) => !/\.(png|jpe?g|gif|webp|svg|css|js|ico|woff2?|m3u8|mp4|mpd)(\?|$)/i.test(u) &&
     !/(google|gstatic|googletagmanager|facebook|twitter|cloudflare|jquery|fonts\.|wp\.com|animeyt\.cc|w3\.org|schema\.org)/i.test(hostOf(u)) &&
