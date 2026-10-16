@@ -555,7 +555,5 @@ async function resolve(ref) {
   return primary;
 }
 
-// ---------- exports (CommonJS + globales por compatibilidad) ----------
-const api = { search, home, browse, categories, episodes, resolve };
-if (typeof module !== "undefined" && module.exports) module.exports = api;
-try { Object.assign(globalThis, api); } catch (e) {}
+// ---------- exports ES module requeridos por Kino ----------
+export { search, home, browse, categories, episodes, resolve };
