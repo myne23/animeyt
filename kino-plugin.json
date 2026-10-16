@@ -1,7 +1,7 @@
 {
   "id": "animeyt",
   "name": "AnimeYT",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "apiVersion": 6,
   "entry": "plugin.js",
   "description": "Busca anime, donghua y películas subtitulados en AnimeYT.",
@@ -26,7 +26,15 @@
     "vkuser.net",
     "*.vkuser.net",
     "cdnvideo.ru",
-    "*.cdnvideo.ru"
+    "*.cdnvideo.ru",
+    "bysesukior.com",
+    "*.bysesukior.com",
+    "mega.nz",
+    "*.mega.nz",
+    "mega.io",
+    "*.mega.io",
+    "player.abyssplayer.com",
+    "*.abyssplayer.com"
   ],
   "capabilities": [
     "search",
