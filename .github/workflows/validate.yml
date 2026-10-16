@@ -1,0 +1,23 @@
+name: Validate Kino plugin
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Smoke tests
+        run: node test/smoke-test.mjs
+      - name: Validate manifest and exported capabilities
+        run: node sdk/validate.mjs .
