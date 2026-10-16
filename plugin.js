@@ -606,7 +606,7 @@ async function resolveWithBrowser(url, referer) {
     });
     const media = (cap && Array.isArray(cap.media) ? cap.media : [])
       .filter((m) => m && m.url)
-      .sort((a, b) => (/\\.m3u8/i.test(b.url) ? 1 : 0) - (/\\.m3u8/i.test(a.url) ? 1 : 0));
+      .sort((a, b) => (/\.m3u8/i.test(b.url) ? 1 : 0) - (/\.m3u8/i.test(a.url) ? 1 : 0));
     log("navegador resultado", host, "ms", T0() - started,
       "medios", media.map((m) => safeUrl(m.url) + ":" + (m.mime || mimeOf(m.url))).join(" | ") || "(ninguno)");
     const m = media[0];
@@ -627,10 +627,10 @@ async function resolveWithBrowser(url, referer) {
 async function resolveEmbed(url, referer) {
   const host = hostOf(url);
   // Se preservan los resolutores que ya funcionan: OK.ru directo y archivos directos del contenedor.
-  if (/(^|\\.)ok\\.ru$|odnoklassniki/i.test(host)) return resolveOk(url, referer);
+  if (/(^|\.)ok\.ru$|odnoklassniki/i.test(host)) return resolveOk(url, referer);
   // Estos proveedores no exponen el vídeo en su HTML inicial: probar el navegador de Kino.
-  if (/mega\\.nz|mega\\.io|bysesukior\\.com|abyssplayer\\.com/i.test(host)) {
-    if (!/mega\\.nz|mega\\.io/i.test(host)) {
+  if (/mega\.nz|mega\.io|bysesukior\.com|abyssplayer\.com/i.test(host)) {
+    if (!/mega\.nz|mega\.io/i.test(host)) {
       try { return await resolveGeneric(url, referer); }
       catch (e) { log("resolver directo agotado", host, "se probará navegador", String((e && e.message) || e)); }
     }
