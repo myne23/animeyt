@@ -587,6 +587,8 @@ const mimeOf = (u) => (/\.m3u8/i.test(u) ? "application/x-mpegURL" : /\.mpd/i.te
 const unesc = (s) => dec(String(s).replace(/\\\//g, "/").replace(/\\u0026/gi, "&").replace(/\\u002F/gi, "/"));
 const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return ""; } };
 const labelOf = (u) => { const h = hostOf(u); return /ok\.ru/.test(h) ? "OK.ru" : h || "Servidor"; };
+const safeUrl = (u) => { try { const x = new URL(u); return x.origin + x.pathname; } catch (e) { return String(u).split("?")[0].slice(0, 180); } };
+const describeUrls = (urls) => urls.slice(0, 12).map((u) => safeUrl(u)).join(" | ") || "(ninguna)";
 
 function unpackAll(text) {
   const out = [];
@@ -637,9 +639,13 @@ async function resolveOk(url, referer) {
 
 async function resolveGeneric(url, referer) {
   const r = await kino.fetch(url, { headers: { "User-Agent": UA, Referer: referer || BASE + "/" }, timeoutMs: 9000 });
-  const { media } = harvest(r.text());
+  const body = r.text();
+  const harvested = harvest(body);
+  const media = harvested.media;
+  log("resolver inspección", safeUrl(url), "status", r.status, "html", body.length, "media", describeUrls(media), "embeds", describeUrls(harvested.embeds));
   const best = media.find((u) => /\.m3u8/i.test(u)) || media[0];
   if (!best) throw kino.error("unavailable", "sin media en " + hostOf(url));
+  log("resolver medio", safeUrl(url), "=>", safeUrl(best), "tipo", mimeOf(best));
   return { url: best, mime: mimeOf(best), headers: { Referer: url, "User-Agent": UA }, label: labelOf(url) };
 }
 
@@ -657,14 +663,24 @@ async function containerSources(cUrl, referer) {
   const open = cUrl.replace(/&?only=[^&]*/g, "").replace(/&?lang=[^&]*/g, "").replace(/[?&]open=1/, "") + (cUrl.includes("?") ? "&" : "?") + "open=1";
   let html = "";
   try { html = (await kino.fetch(open.replace("?&", "?"), { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text(); } catch (e) { log("container fetch", String(e)); }
-  merge(harvest(html));
-  log("container html", html.length, "media", found.media.length, "embeds", found.embeds.length);
+  const htmlFound = harvest(html);
+  merge(htmlFound);
+  log("container HTML", safeUrl(open), "chars", html.length, "media", describeUrls(htmlFound.media), "embeds", describeUrls(htmlFound.embeds));
 
-  // scripts externos propios (mytsumi) + endpoints mencionados en el JS
+  // Separar enlaces presentes en el HTML de los que solo aparecen en scripts externos.
   const scripts = (html.match(/<script[^>]+src=["'][^"']+["']/gi) || []).map((s) => absUrlFrom(attr(s, "src"), open)).filter((u) => /mytsumi/i.test(hostOf(u)));
   let js = html;
-  for (const s of scripts.slice(0, 3)) { try { js += "\n" + (await kino.fetch(s, { headers: { "User-Agent": UA, Referer: open }, timeoutMs: 7000 })).text(); } catch (e) {} }
-  if (js !== html) merge(harvest(js));
+  let externalJs = "";
+  for (const scriptUrl of scripts.slice(0, 3)) {
+    try { externalJs += "\n" + (await kino.fetch(scriptUrl, { headers: { "User-Agent": UA, Referer: open }, timeoutMs: 7000 })).text(); }
+    catch (e) { log("container script error", safeUrl(scriptUrl), String((e && e.message) || e)); }
+  }
+  if (externalJs) {
+    const scriptFound = harvest(externalJs);
+    merge(scriptFound);
+    log("container scripts", scripts.slice(0, 3).map(safeUrl).join(" | "), "media", describeUrls(scriptFound.media), "embeds", describeUrls(scriptFound.embeds));
+    js += externalJs;
+  } else log("container scripts", "sin scripts externos propios");
 
   if (!found.media.length && !found.embeds.length) {
     const eps = new Set();
@@ -680,8 +696,15 @@ async function containerSources(cUrl, referer) {
       for (const n of [1, 2, 3, 4, 5, 6]) calls.push(withId + "&server=" + n);
     }
     const rs = await Promise.all(calls.slice(0, 14).map((u) => kino.fetch(u, { headers: { "User-Agent": UA, Referer: open, "X-Requested-With": "XMLHttpRequest" }, timeoutMs: 7000 }).then((r) => (r.ok ? r.text() : "")).catch(() => "")));
-    rs.forEach((t, i) => { if (t) { log("endpoint resp", calls[i], t.length); merge(harvest(t)); } });
+    rs.forEach((t, i) => {
+      if (t) {
+        const endpointFound = harvest(t);
+        merge(endpointFound);
+        log("endpoint resp", safeUrl(calls[i]), "chars", t.length, "media", describeUrls(endpointFound.media), "embeds", describeUrls(endpointFound.embeds));
+      }
+    });
   }
+  log("container total", "media", found.media.length, describeUrls(found.media), "embeds", found.embeds.length, describeUrls(found.embeds));
   return found;
 }
 function absUrlFrom(u, base) { try { return new URL(unesc(u), base).toString(); } catch (e) { return ""; } }
@@ -724,13 +747,14 @@ async function resolve(ref) {
       if (left() < 6000) break;
       const lang = (/[?&]only=([A-Za-z]+)/.exec(e) || [])[1] || "";
       const src = await containerSources(e, absUrlFrom(path, BASE + "/"));
-      src.media.forEach((u) => candidates.push({ url: u, media: true, lang }));
-      src.embeds.forEach((u) => candidates.push({ url: u, lang }));
-      candidates.push({ url: e, container: true, lang });
+      src.media.forEach((u) => candidates.push({ url: u, media: true, origin: "media-del-contenedor", lang }));
+      src.embeds.forEach((u) => candidates.push({ url: u, origin: "embed-del-contenedor", lang }));
+      candidates.push({ url: e, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
   const prio = (c) => (c.media ? 0 : /ok\.ru/i.test(c.url) ? 1 : c.container ? 9 : 5);
   candidates.sort((a, b) => prio(a) - prio(b));
+  log("candidatos de fuente", candidates.map((c, i) => (i + 1) + ":" + (c.origin || "iframe") + ":" + (c.media ? "media" : c.container ? "container" : "embed") + ":" + safeUrl(c.url) + (c.lang ? ":lang=" + c.lang : "")).join(" || ") || "(ninguno)");
 
   let primary = null; const lazy = [];
   for (const c of candidates) {
@@ -739,8 +763,8 @@ async function resolve(ref) {
     if (left() < 5000) break;
     try {
       primary = c.media ? { url: c.url, mime: mimeOf(c.url), headers: { Referer: "https://mytsumi.com/", "User-Agent": UA }, label: labelOf(c.url) } : await resolveEmbed(c.url, "https://mytsumi.com/");
-      log("ok", labelOf(c.url));
-    } catch (e) { log("falló", labelOf(c.url), String((e && e.message) || e)); }
+      log("fuente resuelta", c.origin || "iframe", "embed", safeUrl(c.url), "nombre", labelOf(c.url), "media final", safeUrl(primary.url), "tipo", primary.mime || mimeOf(primary.url));
+    } catch (e) { log("fuente fallida", c.origin || "iframe", "embed", safeUrl(c.url), "nombre", labelOf(c.url), "error", String((e && e.message) || e)); }
   }
 
   // último recurso: navegador oculto de Kino sobre el contenedor
@@ -750,7 +774,8 @@ async function resolve(ref) {
       try {
         const cap = await kino.browser.capture(cont.url, { timeoutMs: Math.min(18000, left() - 2000), headers: { Referer: BASE + "/" } });
         const m = cap.media[0];
-        if (m) { primary = { url: m.url, mime: m.mime || mimeOf(m.url), headers: m.headers, label: "Navegador" }; log("capture", hostOf(m.url)); }
+        log("navegador captura", "medios", (cap.media || []).map((x) => safeUrl(x.url) + ":" + (x.mime || mimeOf(x.url))).join(" | ") || "(ninguno)");
+        if (m) { primary = { url: m.url, mime: m.mime || mimeOf(m.url), headers: m.headers, label: "Navegador" }; log("navegador elegido", safeUrl(m.url), "tipo", primary.mime); }
       } catch (e) { log("capture falló", String((e && e.code) || e)); }
     }
   }
