@@ -1,0 +1,50 @@
+// Prueba de humo con respuestas simuladas. Valida lógica y sintaxis, NO el sitio real.
+import { readFileSync } from "node:fs";
+import vm from "node:vm";
+const card = (slug, t, rt) => `<article><a href="https://animeyt.cc/tv/${slug}/"><img src="" data-src="https://i0.wp.com/animeyt.cc/wp-content/uploads/2026/09/${slug}.jpg?resize=360%2C510&#038;ssl=1" alt="${t}"> ★ ${rt}<span>Donghua</span></a><h3><a href="https://animeyt.cc/tv/${slug}/">${t}</a></h3><p>En emisión · Otoño 2026</p></article>`;
+const pages = {
+  "https://animeyt.cc/": `<h2>Tensei <span>Temporada 2</span></h2><a href="/tv/tensei-temporada-2/">Ver ficha</a><img src="https://i0.wp.com/x/h.jpg">
+   <h2>Resubidos</h2>${card("black-clover","Black Clover","8,0")}<h2>Últimos episodios</h2>
+   <a href="https://animeyt.cc/118225/anime/tensei-temporada-2-capitulo-3/"><img src="https://i0.wp.com/a.jpg"> T2 EP 3 HOY</a><h3><a href="https://animeyt.cc/118225/anime/tensei-temporada-2-capitulo-3/">Tensei</a></h3><h2>Programación</h2>
+   <a href="/temporada/otono-2026/">Otoño 2026</a>`,
+  "https://animeyt.cc/tv/": card("kyoufu","Kyoufu Collector","8,0")+card("x".repeat(250),"Largo","7,0")+`<a href="/tv/page/2/">2</a>`,
+  "https://animeyt.cc/pelicula/": card("peli","Una Peli","9,0").replace("/tv/","/pelicula/").replace("/tv/","/pelicula/"),
+  "https://animeyt.cc/tv/tensei-temporada-2/": `<meta property="og:title" content="Tensei T2"><meta property="og:image" content="https://x/p.jpg">
+   <h2>Saga</h2><a href="/tv/tensei/"><img src="https://i0.wp.com/s.jpg"></a><a href="/tv/tensei-temporada-2/"><img src="https://i0.wp.com/s2.jpg"></a><h2>Información</h2>
+   <a href="/118225/anime/tensei-temporada-2-capitulo-3/"><img src="https://i0.wp.com/e3.jpg"></a><h3><a href="/118225/anime/tensei-temporada-2-capitulo-3/">El monstruo</a></h3>
+   <a href="/116432/anime/tensei-temporada-2-capitulo-1/"><img src="https://i0.wp.com/e1.jpg"></a><a href="/1/anime/tensei-temporada-2-capitulo-13-5/"><img src="https://i0.wp.com/e.jpg"></a>
+   <a href="/genres/accion/">Acción</a>`,
+  "https://animeyt.cc/118225/anime/tensei-temporada-2-capitulo-3/": `<a href="https://animeyt.cc/tv/tensei-temporada-2/#episodios">Lista</a><iframe src="about:blank"></iframe><iframe data-src="https://mytsumi.com/container.php?id=abc&#038;only=SUB&#038;lang=SUB"></iframe>`,
+  "https://mytsumi.com/container.php?id=abc&open=1": `<div data-embed="https://ok.ru/videoembed/123"></div>`,
+  "https://ok.ru/videoembed/123": `<div data-options="${JSON.stringify({flashvars:{metadata:JSON.stringify({hlsManifestUrl:"https://vd1.okcdn.ru/x.m3u8",videos:[{name:"hd",url:"https://vd1.okcdn.ru/h.mp4"},{name:"sd",url:"https://vd1.okcdn.ru/s.mp4"}]})}}).replace(/"/g,"&quot;")}"></div>`,
+};
+const store = {};
+const kino = {
+  fetch: async (u) => { const t = pages[u] ?? pages[u.replace(/\?.*/, "")]; if (t === undefined) return { ok:false, status:404, text:()=>"" }; return { ok:true, status:200, url:u, text:()=>t }; },
+  error: (c, m) => Object.assign(new Error(m), { code: c }),
+  log: () => {}, storage: { get: k => store[k] ?? null, set: (k, v) => { store[k] = v; } },
+  browser: { capture: async () => { throw Object.assign(new Error("x"), { code: "browser_unavailable" }); } },
+};
+const ctx = { kino, console, URL, module: { exports: {} }, globalThis: {} };
+ctx.globalThis = ctx; vm.createContext(ctx);
+vm.runInContext(readFileSync(new URL("../plugin.js", import.meta.url), "utf8"), ctx);
+const p = ctx.module.exports;
+const eq = (a, b, m) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.error("FAIL", m, JSON.stringify(a), "!=", JSON.stringify(b)); process.exit(1); } };
+
+const rows = await p.home();
+console.log("rows:", rows.map(r => `${r.id}(${r.items.length})`).join(" "));
+eq(rows[0].items[0].title, "Tensei Temporada 2", "hero title");
+const tvRow = rows.find(r => r.id === "explore").items;
+eq(tvRow[1].id.length <= 128, true, "id largo");
+eq(rows.find(r=>r.id==="movies").items[0].kind, "movie", "movie kind");
+const cats = await p.categories(); eq(cats[0].ref, "b|/temporada/otono-2026/", "temporada");
+const b = await p.browse("b|/tv/", null); eq(b.next, "2", "next page");
+const ep = await p.episodes("s|/tv/tensei-temporada-2/");
+eq(ep.episodes.map(e => e.number), [1, 3], "episodios (sin 13.5)");
+eq(ep.seasons.map(s => s.title), ["Temporada 1", "Temporada 2"], "seasons");
+eq(ep.seasons.find(s=>s.current).ref, "s|/tv/tensei-temporada-2/", "season current");
+const ep2 = await p.episodes("x|/118225/anime/tensei-temporada-2-capitulo-3/"); eq(ep2.episodes.length, 2, "x| delega a serie");
+const st = await p.resolve("e|/118225/anime/tensei-temporada-2-capitulo-3/");
+eq(st.url, "https://vd1.okcdn.ru/x.m3u8", "resolve ok.ru HLS");
+console.log("stream:", st.label, st.mime, "alts:", (st.alternatives||[]).length);
+console.log("TODO OK");
