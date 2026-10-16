@@ -1,7 +1,7 @@
 {
   "id": "animeyt",
   "name": "AnimeYT",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "apiVersion": 6,
   "entry": "plugin.js",
   "description": "Busca anime, donghua y películas subtitulados en AnimeYT.",
@@ -28,8 +28,16 @@
     "cdnvideo.ru",
     "*.cdnvideo.ru"
   ],
-  "capabilities": ["search", "home", "browse", "episodes", "resolve"],
+  "capabilities": [
+    "search",
+    "home",
+    "browse",
+    "episodes",
+    "resolve"
+  ],
   "browser": true,
   "debug": true,
-  "categories": ["anime"]
+  "categories": [
+    "anime"
+  ]
 }
