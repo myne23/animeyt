@@ -594,11 +594,49 @@ async function resolveGeneric(url, referer) {
   return { url: best, mime: mimeOf(best), headers: { Referer: url, "User-Agent": UA }, label: labelOf(url) };
 }
 
-async function resolveEmbed(url, referer) {
-  if (/(^|\.)ok\.ru$|odnoklassniki/i.test(hostOf(url))) return resolveOk(url, referer);
-  if (/mega\.nz|mega\.io/i.test(hostOf(url))) throw kino.error("unavailable", "MEGA no reproducible");
-  return resolveGeneric(url, referer);
+async function resolveWithBrowser(url, referer) {
+  const started = T0();
+  const host = hostOf(url);
+  const timeoutMs = 12000;
+  log("navegador inicio", host, safeUrl(url), "timeout_ms", timeoutMs);
+  try {
+    const cap = await kino.browser.capture(url, {
+      timeoutMs,
+      headers: { "User-Agent": UA, Referer: referer || BASE + "/" },
+    });
+    const media = (cap && Array.isArray(cap.media) ? cap.media : [])
+      .filter((m) => m && m.url)
+      .sort((a, b) => (/\\.m3u8/i.test(b.url) ? 1 : 0) - (/\\.m3u8/i.test(a.url) ? 1 : 0));
+    log("navegador resultado", host, "ms", T0() - started,
+      "medios", media.map((m) => safeUrl(m.url) + ":" + (m.mime || mimeOf(m.url))).join(" | ") || "(ninguno)");
+    const m = media[0];
+    if (!m) throw kino.error("unavailable", "navegador sin media en " + host);
+    log("navegador elegido", host, safeUrl(m.url), "tipo", m.mime || mimeOf(m.url), "ms", T0() - started);
+    return {
+      url: m.url,
+      mime: m.mime || mimeOf(m.url),
+      headers: Object.assign({ Referer: url, "User-Agent": UA }, m.headers || {}),
+      label: labelOf(url) + " (navegador)",
+    };
+  } catch (e) {
+    log("navegador fallido", host, "ms", T0() - started, "error", String((e && e.message) || e));
+    throw e;
+  }
 }
+
+async function resolveEmbed(url, referer) {
+  const host = hostOf(url);
+  // Se preservan los resolutores que ya funcionan: OK.ru directo y archivos directos del contenedor.
+  if (/(^|\\.)ok\\.ru$|odnoklassniki/i.test(host)) return resolveOk(url, referer);
+  // Estos proveedores no exponen el vídeo en su HTML inicial: probar el navegador de Kino.
+  if (/mega\\.nz|mega\\.io|bysesukior\\.com|abyssplayer\\.com/i.test(host)) {
+    if (!/mega\\.nz|mega\\.io/i.test(host)) {
+      try { return await resolveGeneric(url, referer); }
+      catch (e) { log("resolver directo agotado", host, "se probará navegador", String((e && e.message) || e)); }
+    }
+    return resolveWithBrowser(url, referer);
+  }
+  return resolveGeneric(url, referer);
 
 /** Lee el contenedor de mytsumi: busca servidores/endpoints en su HTML/JS. */
 async function containerSources(cUrl, referer) {
