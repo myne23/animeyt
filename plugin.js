@@ -360,31 +360,21 @@ async function buildIndex() {
 }
 
 // ---------- episodios ----------
-function slugOfPath(p) { const m = /\/(?:tv|pelicula)\/([^/#?]+)/.exec(p); return m ? m[1] : ""; }
+function slugOfPath(p) { const m = /\\/(?:tv|pelicula)\\/([^/#?]+)/.exec(p); return m ? m[1] : ""; }
 
-async function episodes(ref) {
-  let path = String(ref).replace(/^[a-z]\|/, "");
-  if (/^x\|/.test(ref) || /^\/\d+\/anime\//.test(path)) {
-    const eh = await get(path);
-    const m = /href=["'](?:https?:\/\/animeyt\.cc)?(\/tv\/[^"'#?]+\/?)/i.exec(eh);
-    if (!m) throw kino.error("not_found", "No encontré la serie del episodio");
-    path = m[1];
-  }
-  const html = await get(path);
-  const slug = slugOfPath(path);
-
+// Parsea las tarjetas de episodios tanto del HTML inicial como del endpoint AJAX.
+function parseEpisodeCards(html) {
   const eps = []; const seen = new Set(); let m; ANCHOR.lastIndex = 0;
   const titles = new Map();
-  const hre = /<h[1-4][^>]*>\s*<a\b([^>]*)>([\s\S]*?)<\/a>/gi; let hm;
+  const hre = /<h[1-4][^>]*>\\s*<a\\b([^>]*)>([\\s\\S]*?)<\\/a>/gi; let hm;
   while ((hm = hre.exec(html))) titles.set(pathOf(attr(hm[1], "href")), clean(hm[2]));
   while ((m = ANCHOR.exec(html))) {
     const p = pathOf(attr(m[1], "href")).split("#")[0];
-    const mm = /^\/(\d+)\/anime\/([^/]+)\/?$/.exec(p);
+    const mm = /^\\/(\\d+)\\/anime\\/([^/]+)\\/?$/.exec(p);
     if (!mm || seen.has(p)) continue;
-    const nm = /capitulo-(\d+)(?:-(\d+))?/.exec(mm[2]);
+    const nm = /capitulo-(\\d+)(?:-(\\d+))?/.exec(mm[2]);
     if (!nm) continue;
-    // AnimeYT codifica episodios .5 como "-5" (por ejemplo, capitulo-13-5).
-    // Otros sufijos pueden indicar episodios dobles; no los convertimos a números falsos.
+    // Mantener la lógica ya existente para episodios .5 y evitar sufijos dobles falsos.
     if (nm[2] && nm[2] !== "5") continue;
     const num = parseInt(nm[1], 10) + (nm[2] === "5" ? 0.5 : 0);
     if (num < 1 || num > 99999) continue;
@@ -394,28 +384,107 @@ async function episodes(ref) {
     const img = firstImg(m[2]); if (img) ep.still = posterOf(img);
     eps.push(ep);
   }
-  const uniq = new Map(); eps.forEach((e) => { if (!uniq.has(e.number)) uniq.set(e.number, e); });
-  const list = [...uniq.values()].sort((a, b) => a.number - b.number);
+  return eps;
+}
+
+function episodeQuality(ep) {
+  return (ep.title ? 2 : 0) + (ep.still ? 1 : 0);
+}
+function mergeEpisodeLists(...lists) {
+  const byNumber = new Map();
+  for (const list of lists) for (const ep of list) {
+    const old = byNumber.get(ep.number);
+    if (!old || episodeQuality(ep) > episodeQuality(old)) byNumber.set(ep.number, ep);
+  }
+  return [...byNumber.values()].sort((a, b) => a.number - b.number);
+}
+
+function episodeBrowserInfo(html) {
+  const section = /<section\\b[^>]*data-abismo-episode-browser[^>]*>/i.exec(html);
+  if (!section) return null;
+  const tag = section[0];
+  const animeId = attr(tag, "data-anime-id");
+  const blocks = parseInt(attr(tag, "data-blocks"), 10);
+  const endpoint = attr(tag, "data-endpoint");
+  if (!animeId || !Number.isFinite(blocks) || blocks < 1 || !endpoint) return null;
+  return { animeId, blocks: Math.min(blocks, 100), endpoint: absUrl(endpoint) };
+}
+
+async function fetchEpisodeBlock(info, block) {
+  const url = new URL(info.endpoint);
+  url.searchParams.set("anime_id", info.animeId);
+  url.searchParams.set("block", String(block));
+  url.searchParams.set("order", "ASC");
+  let lastError;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const raw = await get(url.toString(), { timeoutMs: 4500 });
+      const data = JSON.parse(raw);
+      if (typeof data.html !== "string") throw new Error("respuesta sin html para bloque " + block);
+      return parseEpisodeCards(data.html);
+    } catch (e) {
+      lastError = e;
+      if (attempt < 2) log("reintento bloque", block, attempt + 1, String((e && e.message) || e));
+    }
+  }
+  log("bloque no disponible", block, String((lastError && lastError.message) || lastError));
+  return [];
+}
+
+async function episodes(ref) {
+  let path = String(ref).replace(/^[a-z]\\|/, "");
+  if (/^x\\|/.test(ref) || /^\\/\\d+\\/anime\\//.test(path)) {
+    const eh = await get(path);
+    const m = /href=["'](?:https?:\\/\\/animeyt\\.cc)?(\\/tv\\/[^"'#?]+\\/?)/i.exec(eh);
+    if (!m) throw kino.error("not_found", "No encontré la serie del episodio");
+    path = m[1];
+  }
+  const html = await get(path);
+  const slug = slugOfPath(path);
+  const initial = parseEpisodeCards(html);
+  let eps = initial;
+
+  // Las fichas largas cargan los demás bloques mediante el navegador de episodios Abismo.
+  // Si el endpoint falla, conservamos los episodios del HTML inicial.
+  const info = episodeBrowserInfo(html);
+  if (info && info.blocks > 0) {
+    const started = Date.now();
+    const all = [];
+    for (let from = 0; from < info.blocks && Date.now() - started < 20000; from += 6) {
+      const batch = [];
+      for (let b = from; b < Math.min(from + 6, info.blocks); b++) batch.push(b);
+      const results = await Promise.all(batch.map((b) => fetchEpisodeBlock(info, b)));
+      all.push(...results.flat());
+    }
+    if (all.length) {
+      eps = mergeEpisodeLists(initial, all);
+      log("episode browser", slug, "bloques", info.blocks, "iniciales", initial.length, "recuperados", all.length, "únicos", eps.length);
+    } else {
+      log("episode browser sin resultados; uso HTML inicial", slug, initial.length);
+    }
+  }
+
+  const list = mergeEpisodeLists(eps);
   if (!list.length) throw kino.error("not_found", "Sin episodios publicados");
 
-  const og = (n) => { const r = new RegExp("<meta[^>]+property=[\"']og:" + n + "[\"'][^>]*content=[\"']([^\"']*)", "i").exec(html) || new RegExp("<meta[^>]+content=[\"']([^\"']*)[\"'][^>]+property=[\"']og:" + n + "[\"']", "i").exec(html); return r ? dec(r[1]) : ""; };
-  const genres = []; const gre = /\/genres\/[^"']+["'][^>]*>([^<]+)</gi; let gm;
+  const og = (n) => { const r = new RegExp("<meta[^>]+property=[\\\"']og:" + n + "[\\\"'][^>]*content=[\\\"']([^\\\"']*)", "i").exec(html) || new RegExp("<meta[^>]+content=[\\\"']([^\\\"']*)[\\\"'][^>]+property=[\\\"']og:" + n + "[\\\"']", "i").exec(html); return r ? dec(r[1]) : ""; };
+  const genres = []; const gre = /\\/genres\\/[^"']+["'][^>]*>([^<]+)</gi; let gm;
   while ((gm = gre.exec(html)) && genres.length < 5) { const g = clean(gm[1]); if (g && !genres.includes(g)) genres.push(g); }
   const series = { title: og("title") || undefined, poster: og("image") || undefined, overview: og("description") || undefined, genres };
 
   // temporadas: cada una es su propia ficha /tv/ (sección "Saga")
-  const base = slug.replace(/-temporada-\d+.*$/, "");
+  const base = slug.replace(/-temporada-\\d+.*$/, "");
   const seasons = []; const sseen = new Set();
-  const saga = region(html, />\s*Saga\s*</i, /Informaci[oó]n|Reparto/i) || html;
+  const saga = region(html, />\\s*Saga\\s*</i, /Informaci[oó]n|Reparto/i) || html;
   ANCHOR.lastIndex = 0;
   while ((m = ANCHOR.exec(saga))) {
     const p = pathOf(attr(m[1], "href")).split("#")[0];
-    const mm = /^\/tv\/([^/]+)\/?$/.exec(p);
+    const mm = /^\\/tv\\/([^/]+)\\/?$/.exec(p);
     if (!mm || sseen.has(mm[1])) continue;
     const s = mm[1];
     if (s !== base && !s.startsWith(base + "-temporada-")) continue;
     sseen.add(s);
-    const tn = /-temporada-(\d+)/.exec(s);
+    const tn = /-temporada-(\\d+)/.exec(s);
     const n = tn ? parseInt(tn[1], 10) : 1;
     seasons.push({ id: itemId(s), ref: "s|/tv/" + s + "/", title: "Temporada " + n, number: n, current: s === slug });
   }
