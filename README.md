@@ -2,16 +2,13 @@
 
 Plugin (apiVersion 6) para https://animeyt.cc — anime, donghua y películas sub español.
 
-## Estado: BASE sin probar en la app
-Hecho a partir de análisis del sitio sin poder ejecutar red desde el entorno de desarrollo.
-`node test/smoke-test.mjs` valida la lógica con HTML simulado, **no** los selectores reales.
+## Estado: primera corrección de catálogo y búsqueda
+La prueba en Kino confirmó que los catálogos principales cargan y que la reproducción funciona con algunas fuentes. Se está corrigiendo por etapas; el test simulado valida lógica, pero no reemplaza la prueba en la app.
 
 ## Qué hace
-- `home`: En emisión (hero), Resubidos, Últimos episodios, Explorar, Películas.
+- `home`: En emisión (hero), Resubidos, Últimos episodios, Explorar, Películas. La sección de novedades se extrae desde el encabezado real, evitando confundirla con el enlace del menú; cada episodio usa un ID propio y conserva su miniatura.
 - `browse`: paginación `/tv/page/N/` (+ `?tipo=ova|ona|especial|musical`), `categories`.
-- `search`: prueba en paralelo parámetros del buscador (`q`, `buscar`, `search`, `busqueda`, `s`),
-  valida que filtren y guarda el que funcione. Respaldo: índice local de `/tv/page/N/` (se completa en
-  varias búsquedas). Si descubrís el parámetro real, ponelo en `SEARCH_PARAM_HINT`.
+- `search`: prueba parámetros del buscador (`q`, `buscar`, `search`, `busqueda`, `s`), valida que filtren y guarda el que funcione. Elimina fichas repetidas por slug y distingue temporadas cuando la web devuelve el mismo título para varias fichas. Respaldo: índice local de `/tv/page/N/`.
 - `episodes`: cada temporada es una ficha `/tv/` propia → se exponen como `seasons` (sección "Saga").
   Se omiten episodios decimales (13.5, recaps) porque `number` es entero.
 - `resolve`: episodio → iframe `mytsumi.com/container.php?id=…` → lee el contenedor (HTML, scripts,
@@ -32,6 +29,5 @@ Hecho a partir de análisis del sitio sin poder ejecutar red desde el entorno de
 Antes de publicar: quitar `"debug": true`.
 
 ## Instalar
-Copiá estos archivos a un repo generado desde `kinotvapp/kino-plugin-archive` (o sobre el de DonghuaLife,
-reemplazando `plugin.js`, `kino-plugin.json`, `icon.png`), y en Kino: Ajustes → Plugins → `usuario/repo`.
-Validar: `node sdk/validate.mjs .` y `node sdk/run.mjs ./plugin.js home`.
+En Kino: Ajustes → Plugins → agregá `myne23/animeyt` para instalar la versión de `main`. Este repositorio es independiente: no copies estos archivos encima de DonghuaLife ni de otros plugins.
+Validar localmente: `node test/smoke-test.mjs`.
