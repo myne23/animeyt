@@ -30,7 +30,7 @@ const episodeCards = (from, to) => {
   return html;
 };
 pages["https://animeyt.cc/tv/black-clover/"] =
-  `<meta property="og:title" content="Black Clover"><section data-abismo-episode-browser data-anime-id="86" data-blocks="4" data-endpoint="https://animeyt.cc/wp-json/aniyt/v1/anime-episode-browser">${episodeCards(151,170)}</section>`;
+  `<meta property="og:title" content="Black Clover"><h2>Saga</h2><a href="/tv/black-clover/"><img src="https://i0.wp.com/s1.jpg"></a><a href="/tv/black-clover-temporada-2/"><img src="https://i0.wp.com/s2.jpg"></a><h2>Información</h2><section data-abismo-episode-browser data-anime-id="86" data-blocks="4" data-endpoint="https://animeyt.cc/wp-json/aniyt/v1/anime-episode-browser">${episodeCards(151,170)}</section>`;
 for (const [block, from, to] of [[0,1,50],[1,51,100],[2,101,150],[3,151,170]]) {
   pages[`https://animeyt.cc/wp-json/aniyt/v1/anime-episode-browser?anime_id=86&block=${block}&order=ASC`] =
     JSON.stringify({ html: episodeCards(from,to), count: to-from+1 });
@@ -73,7 +73,10 @@ eq(long.episodes.length, 50, "la ficha larga muestra solo el primer bloque de 50
 eq(long.episodes[0].number, 1, "primer bloque empieza en episodio 1");
 eq(long.episodes[49].number, 50, "primer bloque termina en episodio 50");
 eq(long.episodes[0].still, "https://i0.wp.com/episodes/1.jpg", "miniatura data-src conservada en bloque remoto");
-eq(long.seasons.some(s => s.title === "Capítulos 1-50 T1" && s.current), true, "selector identifica bloque y temporada actual");
+eq(long.seasons.some(s => s.title === "Capítulos 1-50 T1" && s.current), true, "selector identifica bloque actual");
+eq(long.seasons.some(s => s.title === "Temporada 1"), false, "la temporada actual no duplica los bloques");
+eq(long.seasons.some(s => s.title === "Temporada 2"), true, "se conserva la otra temporada real");
+eq(long.seasons.slice(0, 5).map(s => s.title), ["Capítulos 1-50 T1", "Capítulos 51-100 T1", "Capítulos 101-150 T1", "Capítulos 151-170 T1", "Temporada 2"], "los bloques aparecen antes de la siguiente temporada real");
 const long2 = await p.episodes("pb|/tv/black-clover/|1");
 eq(long2.episodes.length, 50, "segundo bloque tiene 50 episodios");
 eq(long2.episodes[0].number, 51, "segundo bloque empieza en episodio 51");
