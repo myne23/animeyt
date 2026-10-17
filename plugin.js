@@ -866,7 +866,8 @@ async function resolveBysekoze(embed, site, label, headers) {
   }
 }
 
-async function resolveEmbed(url, referer) {
+async function resolveEmbed(url, referer, options) {
+  options = options || {};
   const host = hostOf(url);
   // Se preservan los resolutores que ya funcionan: OK.ru directo y archivos directos del contenedor.
   if (/(^|\.)ok\.ru$|odnoklassniki/i.test(host)) return resolveOk(url, referer);
@@ -877,7 +878,11 @@ async function resolveEmbed(url, referer) {
     const headers = { "User-Agent": UA, Referer: referer || "https://mytsumi.com/" };
     const direct = await resolveBysekoze(url, site, "Bysekoze", headers);
     if (direct && direct.skipBrowser) {
-      log("Bysekoze: omito navegador tras agotar PoW; sigo con otra fuente");
+      if (options.allowBrowserOnPow) {
+        log("Bysekoze: PoW agotado en selección manual; pruebo captura del navegador");
+        return await resolveWithBrowser(url, referer);
+      }
+      log("Bysekoze: omito navegador tras agotar PoW en resolución automática");
       throw kino.error("unavailable", "Bysekoze agotó el desafío PoW");
     }
     if (direct) {
@@ -971,7 +976,9 @@ export async function resolve(ref) {
   // alternativa perezosa: v|<url del embed>
   if (/^v\|/.test(ref)) {
     const url = ref.slice(2);
-    return await resolveEmbed(url, BASE + "/");
+    // Como en donghuas-sub-es: si el usuario elige Filemoon manualmente,
+    // permitir la captura de navegador incluso cuando el PoW HTTP agota el tiempo.
+    return await resolveEmbed(url, BASE + "/", { allowBrowserOnPow: true });
   }
 
   const path = ref.replace(/^[a-z]\|/, "");
