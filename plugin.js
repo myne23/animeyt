@@ -1129,7 +1129,7 @@ function pageEmbeds(html) {
     try { filterUrl = new URL(u); } catch (e) { return; }
     const filterHost = filterUrl.hostname.toLowerCase();
     if (/doubleclick|googlesyndication|googleadservices|adservice/i.test(filterHost) ||
-        /(?:^|\\/)ads?(?:\\/|\\.|$)/i.test(filterUrl.pathname)) return;
+        /(?:^|\/)ads?(?:\/|\.|$)/i.test(filterUrl.pathname)) return;
     let x;
     try { x = new URL(u); } catch (e) { return; }
     const h = x.hostname.replace(/^www\./i, "").toLowerCase();
