@@ -1022,9 +1022,21 @@ export async function resolve(ref) {
     const cont = candidates.find((c) => c.container);
     if (cont && left() > 8000) {
       try {
-        const cap = await kino.browser.capture(cont.url, { timeoutMs: Math.min(18000, left() - 2000), headers: { Referer: BASE + "/" } });
-        const m = cap.media[0];
-        log("navegador captura", "medios", (cap.media || []).map((x) => safeUrl(x.url) + ":" + (x.mime || mimeOf(x.url))).join(" | ") || "(ninguno)");
+        // Usar la misma variante open=1 que inspecciona containerSources.
+        // La URL original con only/lang puede devolver solo el shell sin inicializar el reproductor.
+        const captureUrl = cont.url
+          .replace(/&?only=[^&]*/g, "")
+          .replace(/&?lang=[^&]*/g, "")
+          .replace(/[?&]open=1/, "");
+        const playableContainerUrl = captureUrl + (captureUrl.includes("?") ? "&" : "?") + "open=1";
+        log("navegador captura inicio", safeUrl(playableContainerUrl));
+        const cap = await kino.browser.capture(playableContainerUrl, {
+          timeoutMs: Math.min(18000, left() - 2000),
+          headers: { Referer: absUrlFrom(path, BASE + "/") || BASE + "/" }
+        });
+        const media = cap && Array.isArray(cap.media) ? cap.media : [];
+        const m = media[0];
+        log("navegador captura", "medios", media.map((x) => safeUrl(x.url) + ":" + (x.mime || mimeOf(x.url))).join(" | ") || "(ninguno)");
         if (m) { primary = { url: m.url, mime: m.mime || mimeOf(m.url), headers: m.headers, label: "Navegador" }; log("navegador elegido", safeUrl(m.url), "tipo", primary.mime); }
       } catch (e) { log("capture falló", String((e && e.code) || e)); }
     }
