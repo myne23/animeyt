@@ -653,10 +653,17 @@ function byseMix(a) {
   a[2] = (a[2] + a[3]) >>> 0;
   a[1] = byseRotate((a[1] ^ a[2]) >>> 0, 7);
 }
+// Reutilizar buffers evita crear cientos de miles de arrays durante el PoW.
+const BYSE_POW_STATE = new Uint32Array(4);
+const BYSE_POW_MEMORY = new Uint32Array(512);
+const BYSE_POW_OUT = new Uint32Array(8);
 function byseWorkHash(input) {
-  const mask = 0xffffffff;
-  const state = [1779033703, 3144134277, 1013904242, 2773480762];
-  const memory = new Uint32Array(512);
+  const state = BYSE_POW_STATE;
+  state[0] = 1779033703;
+  state[1] = 3144134277;
+  state[2] = 1013904242;
+  state[3] = 2773480762;
+  const memory = BYSE_POW_MEMORY;
   for (let i = 0; i < input.length; i++) {
     state[0] = byseRotate((state[0] + input.charCodeAt(i)) >>> 0, 7);
     byseMix(state);
@@ -677,7 +684,7 @@ function byseWorkHash(input) {
       byseMix(state);
     }
   }
-  const out = new Uint32Array(8);
+  const out = BYSE_POW_OUT;
   for (let i = 0; i < 8; i++) {
     byseMix(state);
     let v = state[0] >>> 0;
@@ -704,11 +711,17 @@ async function byseSolvePow(nonce, difficulty) {
   if (!Number.isFinite(bits) || bits < 0 || bits > 32) return null;
   if (bits <= 0) return "0";
   const start = Date.now();
-  for (let counter = 0; counter < 200000 && Date.now() - start < 14000; counter++) {
+  let counter = 0;
+  for (; counter < 200000 && Date.now() - start < 14000; counter++) {
     const hash = byseWorkHash(String(nonce) + ":" + counter);
-    if (byseLeadingZeroBits(hash) >= bits) return String(counter);
-    if ((counter & 31) === 31) await kino.sleep(0);
+    if (byseLeadingZeroBits(hash) >= bits) {
+      log("Bysekoze PoW resuelto", "bits", bits, "intentos", counter + 1, "ms", Date.now() - start);
+      return String(counter);
+    }
+    // Yield menos seguido: dormir cada 32 intentos añadía demasiada sobrecarga.
+    if ((counter & 255) === 255) await kino.sleep(0);
   }
+  log("Bysekoze PoW agotado", "bits", bits, "intentos", counter, "ms", Date.now() - start);
   return null;
 }
 function byseFingerprint(tokenData) {
