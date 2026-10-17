@@ -1220,7 +1220,7 @@ export async function resolve(ref) {
         const optAt = lowerPlaybackHtml.indexOf("options.php");
         const mtsAt = lowerPlaybackHtml.indexOf("mytsumi");
         const diagAt = optAt >= 0 ? optAt : mtsAt;
-        const diagSnippet = diagAt >= 0 ? playbackHtml.slice(Math.max(0, diagAt - 150), Math.min(playbackHtml.length, diagAt + 260)).replace(/\\s+/g, " ") : "(sin fragmento)";
+        const diagSnippet = diagAt >= 0 ? playbackHtml.slice(Math.max(0, diagAt - 150), Math.min(playbackHtml.length, diagAt + 260)).replace(/\s+/g, " ") : "(sin fragmento)";
         log("diagnóstico película HTML", playbackPath, "chars", playbackHtml.length, "mytsumi", lowerPlaybackHtml.includes("mytsumi"), "options", lowerPlaybackHtml.includes("options.php"), "iframe", lowerPlaybackHtml.includes("<iframe"), "href", lowerPlaybackHtml.includes("href="), "videoTabs", lowerPlaybackHtml.includes("videotabs"), "fragmento", diagSnippet);
         const found = pageEmbeds(playbackHtml);
         log("película enlace de reproducción", playbackPath, "embeds", found.length);
