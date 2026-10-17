@@ -965,42 +965,8 @@ async function resolveEmbed(url, referer, options) {
     catch (e) { log("Bysekoze HTML sin media; se probará navegador", String((e && e.message) || e)); }
     return resolveWithBrowser(url, referer);
   }
-  // AbyssPlayer: primero comprobar si el reproductor real expone HLS reproducible.
-  // Algunos enlaces MP4 directos resuelven correctamente pero su cabecera no es compatible con el player.
-  if (/abyssplayer\.com/i.test(host)) {
-    let captured = null;
-    try {
-      captured = await resolveWithBrowser(url, referer);
-      const capturedUrl = String(captured && captured.url || "");
-      const capturedMime = String(captured && captured.mime || "");
-      if (/\.m3u8(?:$|[?#])/i.test(capturedUrl) || /mpegurl/i.test(capturedMime)) {
-        log("AbyssPlayer: captura del reproductor encontró HLS; priorizo esa fuente");
-        return captured;
-      }
-      if (capturedUrl && !/\/sora\//i.test(capturedUrl)) {
-        log("AbyssPlayer: captura del reproductor encontró una fuente alternativa", safeUrl(capturedUrl));
-      } else {
-        log("AbyssPlayer: captura sin HLS reproducible; pruebo resolver HTTP");
-        captured = null;
-      }
-    } catch (e) {
-      log("AbyssPlayer captura del reproductor sin fuente utilizable", String((e && e.message) || e));
-    }
-    try {
-      const direct = await resolveAbyssPlayer(url, referer);
-      if (captured && captured.url && captured.url !== direct.url) {
-        log("AbyssPlayer: pruebo la URL capturada distinta del MP4 directo");
-        return captured;
-      }
-      return direct;
-    } catch (e) {
-      log("AbyssPlayer HTTP directo falló; pruebo resolver genérico", String((e && e.message) || e));
-    }
-    if (captured) return captured;
-    try { return await resolveGeneric(url, referer); }
-    catch (e) { log("AbyssPlayer genérico agotado; se probará navegador", String((e && e.message) || e)); }
-    return resolveWithBrowser(url, referer);
-  }
+  // AbyssPlayer necesita descifrar la cabecera MP4 fuera del sandbox de Kino.
+  if (/^player\\.abyssplayer\\.com$/i.test(host)) return abyssExternal(url, referer);
   return resolveGeneric(url, referer);
 }
 
