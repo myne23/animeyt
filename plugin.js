@@ -879,6 +879,50 @@ async function resolveBysekoze(embed, site, label, headers) {
   }
 }
 
+async function resolveAbyssPlayer(embed, referer) {
+  const page = await kino.fetch(embed, {
+    headers: { "User-Agent": UA, Referer: referer || BASE + "/" },
+    timeoutMs: 12000
+  });
+  if (!page.ok) throw new Error("AbyssPlayer HTTP " + page.status);
+  const html = page.text();
+  const start = html.indexOf('const datas = "');
+  if (start < 0) throw new Error("No se encontró const datas");
+  const valueStart = start + 'const datas = "'.length;
+  const valueEnd = html.indexOf('"', valueStart);
+  if (valueEnd < 0) throw new Error("Campo datas incompleto");
+  const packed = atob(html.slice(valueStart, valueEnd));
+  const data = JSON.parse(packed);
+  if (!data || typeof data.media !== "string" || !data.user_id || !data.slug || !data.md5_id) {
+    throw new Error("Faltan campos de identificación o media");
+  }
+  const key = kino.crypto.hash("md5", String(data.user_id) + ":" + String(data.slug) + ":" + String(data.md5_id));
+  const plaintext = kino.crypto.decrypt("aes-256-ctr", {
+    key, iv: key.slice(0, 16), data: data.media,
+    inputEncoding: "base64", outputEncoding: "utf8"
+  });
+  const payload = JSON.parse(plaintext);
+  const sources = payload && payload.mp4 && payload.mp4.sources;
+  if (!Array.isArray(sources) || !sources.length) throw new Error("No se encontraron fuentes MP4");
+  const candidates = sources.filter(x => x && x.url && x.path);
+  if (!candidates.length) throw new Error("Fuentes sin URL o path");
+  candidates.sort((a, b) => {
+    const quality = x => Number((String(x.quality || x.label || x.path).match(/(\d{3,4})\s*p/i) || [])[1]) || 0;
+    return quality(b) - quality(a);
+  });
+  const source = candidates[0];
+  const url = String(source.url).replace(/\/$/, "") + "/" + String(source.path).replace(/^\//, "");
+  const parsed = new URL(url);
+  if (parsed.protocol !== "https:") throw new Error("La fuente no usa HTTPS");
+  log("AbyssPlayer resuelto por HTTP", parsed.hostname, "calidad", String(source.quality || source.label || "auto"));
+  return {
+    url: parsed.href,
+    label: ("AbyssPlayer · " + String(source.quality || source.label || "MP4")).slice(0, 48),
+    headers: { "User-Agent": UA, Referer: "https://player.abyssplayer.com/", Origin: "https://player.abyssplayer.com" },
+    mime: "video/mp4", expiresInSeconds: 300
+  };
+}
+
 async function resolveEmbed(url, referer, options) {
   options = options || {};
   const host = hostOf(url);
@@ -907,10 +951,12 @@ async function resolveEmbed(url, referer, options) {
     catch (e) { log("Bysekoze HTML sin media; se probará navegador", String((e && e.message) || e)); }
     return resolveWithBrowser(url, referer);
   }
-  // Abyss conserva su intento directo y la captura de Kino como alternativa.
+  // AbyssPlayer: probar primero la resolución HTTP con las funciones nativas de Kino.
   if (/abyssplayer\.com/i.test(host)) {
+    try { return await resolveAbyssPlayer(url, referer); }
+    catch (e) { log("AbyssPlayer HTTP directo falló; pruebo resolver genérico", String((e && e.message) || e)); }
     try { return await resolveGeneric(url, referer); }
-    catch (e) { log("resolver directo agotado", host, "se probará navegador", String((e && e.message) || e)); }
+    catch (e) { log("AbyssPlayer genérico agotado; se probará navegador", String((e && e.message) || e)); }
     return resolveWithBrowser(url, referer);
   }
   return resolveGeneric(url, referer);
