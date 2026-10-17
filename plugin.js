@@ -1117,10 +1117,14 @@ function pageEmbeds(html) {
     try { x = new URL(u); } catch (e) { return; }
     const h = x.hostname.replace(/^www\./i, "").toLowerCase();
     // MyTsumi puede aparecer como iframe real o como enlace <a> con el texto "iframe".
-    if (h === "mytsumi.com" && x.pathname === "/container.php" && x.searchParams.has("id")) {
+    if (h === "mytsumi.com" &&
+        ((x.pathname === "/container.php" && x.searchParams.has("id")) ||
+         (x.pathname === "/multiplayer/options.php" && x.searchParams.has("value") && x.searchParams.has("server")))) {
       if (!out.includes(u)) out.push(u);
       return;
     }
+    // YouTube embeds in these episode pages are trailers/widgets, not the published player.
+    if (/^(?:www\.)?(?:youtube\.com|youtube-nocookie\.com|youtu\.be)$/i.test(h)) return;
     if (/^(?:[a-z0-9-]+\.)?ok\.ru$/i.test(h) && /\/videoembed\/\d+/.test(x.pathname)) {
       if (!out.includes(u)) out.push(u);
       return;
