@@ -898,7 +898,7 @@ async function resolveAbyssPlayer(embed, referer) {
   }
   const key = kino.crypto.hash("md5", String(data.user_id) + ":" + String(data.slug) + ":" + String(data.md5_id));
   const plaintext = kino.crypto.decrypt("aes-256-ctr", {
-    key, iv: key.slice(0, 16), data: data.media,
+    key, iv: key.slice(0, 16), data: btoa(data.media),
     inputEncoding: "base64", outputEncoding: "utf8"
   });
   const payload = JSON.parse(plaintext);
