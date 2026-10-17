@@ -1145,6 +1145,10 @@ function pageEmbeds(html) {
   }
   // Respaldo para URLs completas serializadas dentro de scripts o atributos escapados.
   (source.match(/https?:\/\/[^\s"'<>\\]+/g) || []).forEach(add);
+  // En películas el anchor puede apuntar a options.php sin iframe convencional.
+  const optionsRe = /https?:\\?\/\\?\/(?:www\\?\.)?mytsumi\.com\\?\/multiplayer\\?\/options\.php[^\s"'<>\\]*/gi;
+  let om;
+  while ((om = optionsRe.exec(source))) add(unesc(om[0]).replace(/\\\//g, "/"));
   return out;
 }
 
@@ -1206,13 +1210,13 @@ export async function resolve(ref) {
 
   const candidates = []; // { url, kind }
   for (const e of embeds) {
-    if (/mytsumi\.com\/container\.php/.test(e)) {
+    if (/mytsumi\.com\/(?:container\.php|multiplayer\/options\.php)/i.test(e)) {
       if (left() < 6000) break;
       const lang = (/[?&]only=([A-Za-z]+)/.exec(e) || [])[1] || "";
       const src = await containerSources(e, absUrlFrom(path, BASE + "/"));
       src.media.forEach((u) => candidates.push({ url: u, media: true, origin: "media-del-contenedor", lang }));
       src.embeds.forEach((u) => { if (/mega\.nz|mega\.io/i.test(hostOf(u))) { log("fuente omitida", safeUrl(u), "MEGA no es compatible con Kino"); return; } candidates.push({ url: u, origin: "embed-del-contenedor", lang }); });
-      candidates.push({ url: e, container: true, origin: "contenedor", lang });
+      candidates.push({ url: e, container: true, origin: /options\.php/i.test(e) ? "opciones MyTsumi" : "contenedor", lang });
     } else candidates.push({ url: e });
   }
   const prio = (c) => (c.media ? 0 : /ok\.ru/i.test(c.url) ? 1 : c.container ? 9 : 5);
