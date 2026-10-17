@@ -1022,12 +1022,9 @@ export async function resolve(ref) {
     const cont = candidates.find((c) => c.container);
     if (cont && left() > 8000) {
       try {
-        // Usar la misma variante open=1 que inspecciona containerSources.
-        // La URL original con only/lang puede devolver solo el shell sin inicializar el reproductor.
-        const captureUrl = cont.url
-          .replace(/&?only=[^&]*/g, "")
-          .replace(/&?lang=[^&]*/g, "")
-          .replace(/[?&]open=1/, "");
+        // Mantener los filtros de idioma/servidor originales y añadir open=1,
+        // igual que en la navegación real de MyTsumi.
+        const captureUrl = cont.url.replace(/[?&]open=1(?:&|$)/, (m) => m.startsWith("?") ? "?" : "");
         const playableContainerUrl = captureUrl + (captureUrl.includes("?") ? "&" : "?") + "open=1";
         log("navegador captura inicio", safeUrl(playableContainerUrl));
         const cap = await kino.browser.capture(playableContainerUrl, {
