@@ -1170,7 +1170,7 @@ export async function resolve(ref) {
   ref = String(ref);
 
   // Alternativas de media directa: no hacer fetch del MP4 como HTML (Archive.org puede superar 5 MB).
-  if (/^m\|/.test(ref)) {
+  if (/^d\|/.test(ref)) {
     const url = ref.slice(2);
     const host = hostOf(url);
     return {
@@ -1263,7 +1263,7 @@ export async function resolve(ref) {
   let primary = null; const lazy = [];
   for (const c of candidates) {
     if (c.container) continue;
-    if (primary) { lazy.push({ label: c.media ? (/archive\.org/i.test(hostOf(c.url)) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(hostOf(c.url)) ? "Bysekoze" : labelOf(c.url)), ref: (c.media ? "m|" : "v|") + c.url }); continue; }
+    if (primary) { lazy.push({ label: c.media ? (/archive\.org/i.test(hostOf(c.url)) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(hostOf(c.url)) ? "Bysekoze" : labelOf(c.url)), ref: (c.media ? "d|" : "v|") + c.url }); continue; }
     if (left() < 5000) break;
     try {
       primary = c.media ? { url: c.url, mime: mimeOf(c.url), headers: { Referer: "https://mytsumi.com/", "User-Agent": UA }, label: labelOf(c.url) } : await resolveEmbed(c.url, "https://mytsumi.com/");
