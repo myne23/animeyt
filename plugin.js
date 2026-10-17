@@ -925,10 +925,11 @@ function abyssExternal(embed, referer) {
     throw kino.error("not_found", "El enlace no pertenece a AbyssPlayer");
   }
   const slug = parsed.pathname.split("/").filter(Boolean).pop() || "";
-  if (!/^[A-Za-z0-9_-]{4,80}$/.test(slug)) {
+  if (!/^[A-Za-z0-9_-]{4,120}$/.test(slug)) {
     throw kino.error("not_found", "No se encontró el identificador del reproductor Abyss");
   }
-  const ref = "abyss:" + slug + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
+  // Pass the exact embed URL: Abyss may use different path prefixes, so the app must not guess /embed/ or /e/.
+  const ref = "abyss:" + encodeURIComponent(parsed.href) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
   log("AbyssPlayer: delegando al resolutor externo", slug);
   return { external: { protocol: "abyss", ref, resolver: ABYSS_RESOLVER } };
 }
