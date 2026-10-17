@@ -101,7 +101,7 @@ function parseCards(html) {
   }
   const out = [];
   for (const it of bySlug.values()) {
-    if (!it.poster) continue; // sin imagen = enlace de menú/relacionados
+    // El póster es opcional: algunos títulos (incluidos los de géneros especiales) no lo exponen en el HTML.
     const title = titles.get(it.path) || titles.get(it.path.replace(/\/$/, "")) || it.alt || humanize(it.slug);
     const txt = it.text || "";
     const rm = /★\s*(\d+(?:[.,]\d+)?)/.exec(txt);
@@ -119,12 +119,12 @@ const humanize = (s) => String(s).replace(/-/g, " ").replace(/\b\w/g, (c) => c.t
 let ADULT = null;
 async function adultSet() {
   if (ADULT) return ADULT;
-  try { const c = kino.storage.get("adult"); if (c) { ADULT = new Set(JSON.parse(c)); return ADULT; } } catch (e) {}
+  try { const c = kino.storage.get("adult2"); if (c) { ADULT = new Set(JSON.parse(c)); return ADULT; } } catch (e) {}
   const s = new Set();
   const pages = await Promise.all(["/genres/hentai/", "/genres/erotica/"].map((p) => get(p, { timeoutMs: 6000 }).catch(() => "")));
   for (const h of pages) for (const c of parseCards(h)) s.add(c.slug);
   ADULT = s;
-  try { kino.storage.set("adult", JSON.stringify([...s]), { ttlMs: 86400000 }); } catch (e) {}
+  try { kino.storage.set("adult2", JSON.stringify([...s]), { ttlMs: 86400000 }); } catch (e) {}
   return s;
 }
 
@@ -335,26 +335,61 @@ export async function search(q) {
 
 async function buildIndex() {
   let idx = [], done = 0;
-  try { const c = JSON.parse(kino.storage.get("idx") || "null"); if (c) { idx = c.e.map((r) => ({ slug: r[0], title: r[1], poster: r[2] ? "https://i0.wp.com/animeyt.cc/wp-content/uploads/" + r[2] + "?resize=360%2C510&ssl=1" : undefined })); done = c.done; } } catch (e) {}
+  try {
+    const c = JSON.parse(kino.storage.get("idx2") || "null");
+    if (c) {
+      idx = c.e.map((r) => ({ slug: r[0], title: r[1], poster: r[2] ? "https://i0.wp.com/animeyt.cc/wp-content/uploads/" + r[2] + "?resize=360%2C510&ssl=1" : undefined }));
+      done = c.done;
+    }
+  } catch (e) {}
   if (done >= 60) return idx;
-  const from = done + 1, to = from + 11; // 12 páginas por llamada
-  const pages = [];
-  for (let p = from; p <= to; p++) pages.push(p);
-  const got = await Promise.all(pages.map((p) => get(p === 1 ? "/tv/" : "/tv/page/" + p + "/", { timeoutMs: 8000 }).then((h) => parseCards(h)).catch(() => null)));
+
   const known = new Set(idx.map((e) => e.slug));
-  let reached = done, end = false;
-  got.forEach((cards, i) => {
-    if (cards === null) return;
-    if (!cards.length) { end = true; return; }
-    reached = Math.max(reached, pages[i]);
-    for (const c of cards) if (c.kindPath === "tv" && !known.has(c.slug)) {
+  // Complementar el archivo general con los géneros que pueden organizar títulos especiales.
+  // Se hace durante el primer llenado del índice y se deduplica por slug.
+  if (done === 0) {
+    const genres = await Promise.all(["/genres/hentai/", "/genres/erotica/"].map((p) =>
+      get(p, { timeoutMs: 7000 }).then((h) => parseCards(h)).catch(() => [])
+    ));
+    for (const cards of genres) for (const c of cards) {
+      if (c.kindPath !== "tv" || known.has(c.slug)) continue;
       known.add(c.slug);
       idx.push({ slug: c.slug, title: c.title, poster: c.poster });
     }
-  });
+  }
+
+  const from = done + 1, to = from + 11;
+  const pages = [];
+  for (let p = from; p <= to; p++) pages.push(p);
+  const got = await Promise.all(pages.map(async (p) => {
+    const url = p === 1 ? "/tv/" : "/tv/page/" + p + "/";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const html = await get(url, { timeoutMs: 9000 });
+        return { page: p, cards: parseCards(html), hasNext: new RegExp("/page/" + (p + 1) + "/").test(html) };
+      } catch (e) {}
+    }
+    return null;
+  }));
+
+  let contiguous = done;
+  let endReached = false;
+  for (let i = 0; i < got.length; i++) {
+    const result = got[i];
+    if (!result) break; // No saltar páginas fallidas: la siguiente búsqueda las reintentará.
+    contiguous = result.page;
+    if (!result.cards.length && !result.hasNext) {
+      endReached = true;
+      break;
+    }
+    for (const c of result.cards) if (c.kindPath === "tv" && !known.has(c.slug)) {
+      known.add(c.slug);
+      idx.push({ slug: c.slug, title: c.title, poster: c.poster });
+    }
+  }
   try {
     const compact = idx.map((e) => [e.slug, e.title, ((e.poster || "").split("/wp-content/uploads/")[1] || "").split("?")[0]]);
-    kino.storage.set("idx", JSON.stringify({ done: end ? 999 : reached, e: compact }), { ttlMs: 604800000 });
+    kino.storage.set("idx2", JSON.stringify({ done: endReached ? 999 : contiguous, e: compact }), { ttlMs: 604800000 });
   } catch (e) { log("idx no guardado", String(e)); }
   return idx;
 }
