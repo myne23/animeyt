@@ -1,7 +1,7 @@
 {
   "id": "animeyt",
   "name": "AnimeYT",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "apiVersion": 6,
   "entry": "plugin.js",
   "description": "Busca anime, donghua y películas subtitulados en AnimeYT.",
@@ -45,5 +45,6 @@
   "debug": true,
   "categories": [
     "anime"
-  ]
+  ],
+  "streamHosts": "any"
 }
