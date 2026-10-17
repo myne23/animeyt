@@ -17,6 +17,7 @@ export default {
     const reqUrl = new URL(request.url);
     if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405 });
     if (reqUrl.pathname === "/health") return new Response("ok", { headers: corsHeaders() });
+    if (reqUrl.pathname === "/selftest") return json({ md5_hola: await md5Hex("hola"), expected: "4d186321c1a7f0f354b297e8914ab240" });
     if (reqUrl.pathname === "/resolve") return resolveRequest(reqUrl, env);
     if (reqUrl.pathname === "/stream") return streamRequest(request, reqUrl, env);
     return new Response("Not found", { status: 404, headers: corsHeaders() });
@@ -36,7 +37,8 @@ function json(data, status = 200) {
 }
 function allowedHost(host, env) {
   const list = String(env.ALLOWED_ORIGINS || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
-  return list.includes(host.toLowerCase());
+  const h = host.toLowerCase();
+  return list.some(entry => entry.startsWith("*.") ? (h.endsWith(entry.slice(1)) && h !== entry.slice(2)) : h === entry);
 }
 function bytesFromLatin1(s) {
   const out = new Uint8Array(s.length);
