@@ -1,7 +1,7 @@
 {
   "id": "animeyt",
   "name": "AnimeYT",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "apiVersion": 6,
   "entry": "plugin.js",
   "description": "Busca anime, donghua y películas subtitulados en AnimeYT.",
@@ -31,9 +31,7 @@
     "*.bysesukior.com",
     "n1mwq.org",
     "*.n1mwq.org",
-    "mega.nz",
     "*.mega.nz",
-    "mega.io",
     "*.mega.io",
     "player.abyssplayer.com",
     "*.abyssplayer.com"
