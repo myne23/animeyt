@@ -637,6 +637,7 @@ async function resolveEmbed(url, referer) {
     return resolveWithBrowser(url, referer);
   }
   return resolveGeneric(url, referer);
+}
 
 /** Lee el contenedor de mytsumi: busca servidores/endpoints en su HTML/JS. */
 async function containerSources(cUrl, referer) {
