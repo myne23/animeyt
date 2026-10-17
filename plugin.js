@@ -908,7 +908,10 @@ async function containerSources(cUrl, referer) {
   const found = { media: [], embeds: [] };
   const merge = (h) => { h.media.forEach((u) => !found.media.includes(u) && found.media.push(u)); h.embeds.forEach((u) => !found.embeds.includes(u) && found.embeds.push(u)); };
   const idm = /[?&]id=([^&]+)/.exec(cUrl); const cid = idm ? idm[1] : "";
-  const open = cUrl.replace(/&?only=[^&]*/g, "").replace(/&?lang=[^&]*/g, "").replace(/[?&]open=1/, "") + (cUrl.includes("?") ? "&" : "?") + "open=1";
+  // Conservar id, idioma y filtros del servidor tal como los usa el navegador real.
+  // Solo añadir open=1 si todavía no está presente.
+  const open = /[?&]open=1(?:&|$)/.test(cUrl) ? cUrl : cUrl + (cUrl.includes("?") ? "&" : "?") + "open=1";
+  log("container URL", "open=1", /[?&]open=1(?:&|$)/.test(open) ? "sí" : "no", "filtros", /[?&]lang=/.test(open) ? "lang presente" : "lang ausente", /[?&]only=/.test(open) ? "only presente" : "only ausente");
   let html = "";
   try { html = (await kino.fetch(open.replace("?&", "?"), { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text(); } catch (e) { log("container fetch", String(e)); }
   const htmlFound = harvest(html);
