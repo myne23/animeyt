@@ -1150,7 +1150,10 @@ function pageEmbeds(html) {
   let m;
   while ((m = tagRe.exec(source))) {
     for (const n of ["src", "data-src", "data-lazy-src", "href", "data-href", "data-url", "data-player-url"]) {
-      const v = attr(m[0], n);
+      // Algunos templates sirven el enlace sin comillas; attr() solo cubre atributos quoted.
+      const re = new RegExp("\\b" + n + "\\s*=\\s*(?:\"([^\"]*)\"|'([^']*)'|([^\\s>]+))", "i");
+      const a = re.exec(m[0]);
+      const v = a ? dec(a[1] != null ? a[1] : a[2] != null ? a[2] : a[3]) : "";
       if (v) add(v);
     }
   }
