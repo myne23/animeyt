@@ -1213,6 +1213,7 @@ export async function resolve(ref) {
     for (const playbackPath of playbackPaths.slice(0, 5)) {
       try {
         const playbackHtml = await get(playbackPath);
+        log("diagnóstico película HTML", playbackPath, "chars", playbackHtml.length, "mytsumi", /mytsumi/i.test(playbackHtml), "options", /options\\.php/i.test(playbackHtml), "iframe", /<iframe\\b/i.test(playbackHtml), "href", /href\\s*=/i.test(playbackHtml), "videoTabs", /videoTabs/i.test(playbackHtml));
         const found = pageEmbeds(playbackHtml);
         log("película enlace de reproducción", playbackPath, "embeds", found.length);
         if (found.length) {
