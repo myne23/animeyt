@@ -1149,7 +1149,7 @@ function pageEmbeds(html) {
   const tagRe = /<(?:iframe|a|button|source)\b[^>]*>/gi;
   let m;
   while ((m = tagRe.exec(source))) {
-          "href", /href\s*=/i.test(playbackHtml),
+    for (const n of ["src", "data-src", "data-lazy-src", "href", "data-href", "data-url", "data-player-url"]) {
       const v = attr(m[0], n);
       if (v) add(v);
     }
@@ -1267,8 +1267,8 @@ export async function resolve(ref) {
     if (left() < 5000) break;
     try {
       primary = c.media ? { url: c.url, mime: mimeOf(c.url), headers: { Referer: "https://mytsumi.com/", "User-Agent": UA }, label: labelOf(c.url) } : await resolveEmbed(c.url, "https://mytsumi.com/");
-          "iframe", /<iframe\b/i.test(playbackHtml),
-          "iframe", /<iframe\b/i.test(playbackHtml),
+      log("fuente resuelta", c.origin || "iframe", "embed", safeUrl(c.url), "nombre", labelOf(c.url), "media final", safeUrl(primary.url), "tipo", primary.mime || mimeOf(primary.url));
+    } catch (e) { log("fuente fallida", c.origin || "iframe", "embed", safeUrl(c.url), "nombre", labelOf(c.url), "error", String((e && e.message) || e)); }
   }
 
   // último recurso: navegador oculto de Kino sobre el contenedor
