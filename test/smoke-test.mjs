@@ -114,5 +114,5 @@ for (const host of ["https://bysesukior.com/e/test", "https://mega.nz/embed/test
 const abyss = await p.resolve("v|https://player.abyssplayer.com/m27Fa0uPI");
 eq(abyss.external.protocol, "abyss", "Abyss uses external resolver protocol");
 eq(abyss.external.resolver, "com.myne23.abyssresolver", "Abyss names the companion app");
-eq(abyss.external.ref, "abyss:m27Fa0uPI:best:https%3A%2F%2Fmytsumi.com%2F", "Abyss ref encodes slug, quality and referer");
+eq(abyss.external.ref, "abyss:https%3A%2F%2Fplayer.abyssplayer.com%2Fm27Fa0uPI:best:https%3A%2F%2Fmytsumi.com%2F", "Abyss ref preserves the exact embed URL, quality and referer");
 console.log("TODO OK");
