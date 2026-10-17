@@ -913,6 +913,11 @@ async function containerSources(cUrl, referer) {
   try { html = (await kino.fetch(open.replace("?&", "?"), { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text(); } catch (e) { log("container fetch", String(e)); }
   const htmlFound = harvest(html);
   merge(htmlFound);
+  const playerFound = harvestMytsumiPlayers(html, open);
+  merge(playerFound);
+  if (playerFound.media.length || playerFound.embeds.length) {
+    log("container botones MyTsumi", "media", describeUrls(playerFound.media), "embeds", describeUrls(playerFound.embeds));
+  }
   log("container HTML", safeUrl(open), "chars", html.length, "media", describeUrls(htmlFound.media), "embeds", describeUrls(htmlFound.embeds));
 
   // Separar enlaces presentes en el HTML de los que solo aparecen en scripts externos.
@@ -956,6 +961,24 @@ async function containerSources(cUrl, referer) {
   return found;
 }
 function absUrlFrom(u, base) { try { return new URL(unesc(u), base).toString(); } catch (e) { return ""; } }
+
+// MyTsumi publica los servidores del reproductor como botones con data-player-url.
+// Extraerlos explícitamente evita depender de que la URL aparezca en un script o texto suelto.
+function harvestMytsumiPlayers(html, base) {
+  const out = { media: [], embeds: [] };
+  const tags = String(html || "").match(/<(?:button|a)\\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const raw = attr(tag, "data-player-url");
+    if (!raw) continue;
+    const url = absUrlFrom(raw, base);
+    if (!/^https?:\\/\\//i.test(url)) continue;
+    const kind = attr(tag, "data-player-kind").toLowerCase();
+    if (kind === "video" || /\\.(?:mp4|m3u8|mpd|webm)(?:$|[?#])/i.test(url)) {
+      if (!out.media.includes(url)) out.media.push(url);
+    } else if (!out.embeds.includes(url)) out.embeds.push(url);
+  }
+  return out;
+}
 
 function pageEmbeds(html) {
   const out = [];
