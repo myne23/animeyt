@@ -1149,7 +1149,7 @@ function pageEmbeds(html) {
   const tagRe = /<(?:iframe|a|button|source)\b[^>]*>/gi;
   let m;
   while ((m = tagRe.exec(source))) {
-    for (const n of ["src", "data-src", "data-lazy-src", "href", "data-href", "data-url", "data-player-url"]) {
+          "href", /href\s*=/i.test(playbackHtml),
       const v = attr(m[0], n);
       if (v) add(v);
     }
@@ -1219,13 +1219,13 @@ export async function resolve(ref) {
         log("diagnóstico página película", playbackPath,
           "chars", playbackHtml.length,
           "mytsumi", /mytsumi/i.test(playbackHtml),
-          "options.php", /options\\?\.php|options\.php/i.test(playbackHtml),
-          "iframe", /<iframe\\b/i.test(playbackHtml),
-          "href", /href\\s*=/i.test(playbackHtml),
+          "options.php", /options\.php/i.test(playbackHtml),
+          "iframe", /<iframe\b/i.test(playbackHtml),
+          "href", /href\s*=/i.test(playbackHtml),
           "videoTabs", /videoTabs/i.test(playbackHtml),
           "azakuEncodedURL", /azakuEncodedURL/i.test(playbackHtml));
-        const myPos = playbackHtml.search(/mytsumi|options\\?\.php/i);
-        if (myPos >= 0) log("fragmento reproductor película", playbackHtml.slice(Math.max(0, myPos - 180), Math.min(playbackHtml.length, myPos + 420)).replace(/\\s+/g, " "));
+        const myPos = playbackHtml.search(/mytsumi|options\.php/i);
+        if (myPos >= 0) log("fragmento reproductor película", playbackHtml.slice(Math.max(0, myPos - 180), Math.min(playbackHtml.length, myPos + 420)).replace(/\s+/g, " "));
         log("película enlace de reproducción", playbackPath, "embeds", found.length);
         if (found.length) {
           html = playbackHtml;
@@ -1279,8 +1279,8 @@ export async function resolve(ref) {
     if (left() < 5000) break;
     try {
       primary = c.media ? { url: c.url, mime: mimeOf(c.url), headers: { Referer: "https://mytsumi.com/", "User-Agent": UA }, label: labelOf(c.url) } : await resolveEmbed(c.url, "https://mytsumi.com/");
-      log("fuente resuelta", c.origin || "iframe", "embed", safeUrl(c.url), "nombre", labelOf(c.url), "media final", safeUrl(primary.url), "tipo", primary.mime || mimeOf(primary.url));
-    } catch (e) { log("fuente fallida", c.origin || "iframe", "embed", safeUrl(c.url), "nombre", labelOf(c.url), "error", String((e && e.message) || e)); }
+          "iframe", /<iframe\b/i.test(playbackHtml),
+          "iframe", /<iframe\b/i.test(playbackHtml),
   }
 
   // último recurso: navegador oculto de Kino sobre el contenedor
