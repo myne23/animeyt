@@ -966,14 +966,14 @@ function absUrlFrom(u, base) { try { return new URL(unesc(u), base).toString(); 
 // Extraerlos explícitamente evita depender de que la URL aparezca en un script o texto suelto.
 function harvestMytsumiPlayers(html, base) {
   const out = { media: [], embeds: [] };
-  const tags = String(html || "").match(/<(?:button|a)\\b[^>]*>/gi) || [];
+  const tags = String(html || "").match(/<(?:button|a)\b[^>]*>/gi) || [];
   for (const tag of tags) {
     const raw = attr(tag, "data-player-url");
     if (!raw) continue;
     const url = absUrlFrom(raw, base);
-    if (!/^https?:\\/\\//i.test(url)) continue;
+    if (!/^https?:\/\//i.test(url)) continue;
     const kind = attr(tag, "data-player-kind").toLowerCase();
-    if (kind === "video" || /\\.(?:mp4|m3u8|mpd|webm)(?:$|[?#])/i.test(url)) {
+    if (kind === "video" || /\.(?:mp4|m3u8|mpd|webm)(?:$|[?#])/i.test(url)) {
       if (!out.media.includes(url)) out.media.push(url);
     } else if (!out.embeds.includes(url)) out.embeds.push(url);
   }
