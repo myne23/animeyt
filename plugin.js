@@ -869,9 +869,9 @@ async function resolveBysekoze(embed, site, label, headers) {
 async function resolveEmbed(url, referer) {
   const host = hostOf(url);
   // Se preservan los resolutores que ya funcionan: OK.ru directo y archivos directos del contenedor.
-  if (/(^|\\.)ok\\.ru$|odnoklassniki/i.test(host)) return resolveOk(url, referer);
+  if (/(^|\.)ok\.ru$|odnoklassniki/i.test(host)) return resolveOk(url, referer);
   // Bysekoze/Filemoon: resolver HTTP específico (API, desafío y URL real) antes de la captura genérica.
-  if (/bysekoze\\.com|bysesukior\\.com|n1mwq\\.org/i.test(host)) {
+  if (/bysekoze\.com|bysesukior\.com|n1mwq\.org/i.test(host)) {
     const started = T0();
     const site = { name: "AnimeYT", base: "https://mytsumi.com" };
     const headers = { "User-Agent": UA, Referer: referer || "https://mytsumi.com/" };
@@ -890,8 +890,8 @@ async function resolveEmbed(url, referer) {
     return resolveWithBrowser(url, referer);
   }
   // MEGA y Abyss siguen con su flujo actual.
-  if (/mega\\.nz|mega\\.io|abyssplayer\\.com/i.test(host)) {
-    if (!/mega\\.nz|mega\\.io/i.test(host)) {
+  if (/abyssplayer\.com/i.test(host)) {
+    if (!/mega\.nz|mega\.io/i.test(host)) {
       try { return await resolveGeneric(url, referer); }
       catch (e) { log("resolver directo agotado", host, "se probará navegador", String((e && e.message) || e)); }
     }
@@ -993,7 +993,7 @@ export async function resolve(ref) {
       const lang = (/[?&]only=([A-Za-z]+)/.exec(e) || [])[1] || "";
       const src = await containerSources(e, absUrlFrom(path, BASE + "/"));
       src.media.forEach((u) => candidates.push({ url: u, media: true, origin: "media-del-contenedor", lang }));
-      src.embeds.forEach((u) => candidates.push({ url: u, origin: "embed-del-contenedor", lang }));
+      src.embeds.forEach((u) => { if (/mega\.nz|mega\.io/i.test(hostOf(u))) { log("fuente omitida", safeUrl(u), "MEGA no es compatible con Kino"); return; } candidates.push({ url: u, origin: "embed-del-contenedor", lang }); });
       candidates.push({ url: e, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
