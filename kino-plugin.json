@@ -1,8 +1,8 @@
 {
   "id": "animeyt",
   "name": "AnimeYT",
-  "version": "0.1.41",
-  "apiVersion": 6,
+  "version": "0.1.42",
+  "apiVersion": 11,
   "entry": "plugin.js",
   "description": "Busca anime, donghua y películas subtitulados en AnimeYT.",
   "author": "myne23",
@@ -39,12 +39,16 @@
     "home",
     "browse",
     "episodes",
-    "resolve"
+    "resolve",
+    "externalResolve"
   ],
   "browser": true,
   "debug": true,
   "categories": [
     "anime"
   ],
-  "streamHosts": "any"
+  "streamHosts": "any",
+  "externalResolver": {
+    "package": "com.myne23.abyssresolver"
+  }
 }
