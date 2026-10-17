@@ -889,12 +889,10 @@ async function resolveEmbed(url, referer) {
     catch (e) { log("Bysekoze HTML sin media; se probará navegador", String((e && e.message) || e)); }
     return resolveWithBrowser(url, referer);
   }
-  // MEGA y Abyss siguen con su flujo actual.
+  // Abyss conserva su intento directo y la captura de Kino como alternativa.
   if (/abyssplayer\.com/i.test(host)) {
-    if (!/mega\.nz|mega\.io/i.test(host)) {
-      try { return await resolveGeneric(url, referer); }
-      catch (e) { log("resolver directo agotado", host, "se probará navegador", String((e && e.message) || e)); }
-    }
+    try { return await resolveGeneric(url, referer); }
+    catch (e) { log("resolver directo agotado", host, "se probará navegador", String((e && e.message) || e)); }
     return resolveWithBrowser(url, referer);
   }
   return resolveGeneric(url, referer);
