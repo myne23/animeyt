@@ -1134,11 +1134,43 @@ export async function resolve(ref) {
   const path = ref.replace(/^[a-z]\|/, "");
   let html = await get(path);
   let embeds = pageEmbeds(html);
-  if (!embeds.length) { // película: la ficha puede enlazar a una página de reproducción
-    const wm = /href=["'](?:https?:\/\/animeyt\.cc)?(\/\d+\/anime\/[^"'#]+)/i.exec(html);
-    if (wm) { html = await get(wm[1]); embeds = pageEmbeds(html); }
+  if (!embeds.length) {
+    // Las fichas de películas enlazan a una ruta independiente /<id>/anime/<slug>/.
+    // Buscarla tanto en href normales como en atributos/URLs escapadas, porque el
+    // HTML que devuelve Kino puede no conservar exactamente la forma del enlace.
+    const decoded = unesc(html);
+    const playbackPaths = [];
+    const addPlaybackPath = (value) => {
+      if (!value) return;
+      const u = absUrlFrom(value, absUrlFrom(path, BASE + "/"));
+      const p = pathOf(u).split("#")[0];
+      if (/^\/\d+\/anime\/[^/?#]+\/?$/.test(p) && !playbackPaths.includes(p)) playbackPaths.push(p);
+    };
+    const attrRe = /\b(?:href|data-href|data-url|data-src)\s*=\s*(["'])(.*?)\1/gi;
+    let am;
+    while ((am = attrRe.exec(decoded))) addPlaybackPath(am[2]);
+    const rawPathRe = /(?:https?:\/\/animeyt\.cc)?(\/\d+\/anime\/[^\s"'<>\\?#]+)/gi;
+    let pm;
+    while ((pm = rawPathRe.exec(decoded))) addPlaybackPath(pm[1]);
+    for (const playbackPath of playbackPaths.slice(0, 5)) {
+      try {
+        const playbackHtml = await get(playbackPath);
+        const found = pageEmbeds(playbackHtml);
+        log("película enlace de reproducción", playbackPath, "embeds", found.length);
+        if (found.length) {
+          html = playbackHtml;
+          embeds = found;
+          break;
+        }
+      } catch (e) {
+        log("película enlace no disponible", playbackPath, String((e && e.message) || e));
+      }
+    }
   }
-  if (!embeds.length) throw kino.error("not_found", "El episodio no tiene reproductor publicado");
+  if (!embeds.length) {
+    log("sin reproductor detectable", safeUrl(absUrlFrom(path, BASE + "/")), "tipo", /\/pelicula\//i.test(path) ? "ficha de película" : "página de episodio");
+    throw kino.error("not_found", "El episodio no tiene reproductor publicado");
+  }
   log("embeds", embeds.join(" | "));
 
   const candidates = []; // { url, kind }
