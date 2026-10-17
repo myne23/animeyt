@@ -1087,26 +1087,37 @@ async function containerSources(cUrl, referer) {
   log("container total", "media", found.media.length, describeUrls(found.media), "embeds", found.embeds.length, describeUrls(found.embeds));
   return found;
 }
+function decodeBase64Url(value) {
+  const s = String(value || "").replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  let out = "", buffer = 0, bits = 0;
+  for (const ch of s) { if (ch === "=") break; const n = alphabet.indexOf(ch); if (n < 0) continue; buffer = (buffer << 6) | n; bits += 6; if (bits >= 8) { bits -= 8; out += String.fromCharCode((buffer >> bits) & 255); } }
+  return out;
+}
+function mytsumiContainerUrl(html, base) {
+  const source = unesc(html);
+  const m = /(?:const|let|var)\s+azakuEncodedURL\s*=\s*["\']([^"\']+)["\']/i.exec(source);
+  if (!m) return "";
+  const url = absUrl(decodeBase64Url(m[1]), base);
+  try { const x = new URL(url); if (x.hostname.replace(/^www\./i, "").toLowerCase() !== "mytsumi.com" || !/\/multiplayer\/contenedor\.php$/i.test(x.pathname) || !x.searchParams.has("id")) return ""; return x.toString(); } catch (e) { return ""; }
+}
 function absUrlFrom(u, base) { try { return new URL(unesc(u), base).toString(); } catch (e) { return ""; } }
 
 // MyTsumi publica los servidores del reproductor como botones con data-player-url.
 // Extraerlos explícitamente evita depender de que la URL aparezca en un script o texto suelto.
 function harvestMytsumiPlayers(html, base) {
   const out = { media: [], embeds: [] };
-  const tags = String(html || "").match(/<(?:button|a)\b[^>]*>/gi) || [];
-  for (const tag of tags) {
-    const raw = attr(tag, "data-player-url");
-    if (!raw) continue;
-    const url = absUrlFrom(raw, base);
-    if (!/^https?:\/\//i.test(url)) continue;
-    const kind = attr(tag, "data-player-kind").toLowerCase();
-    if (kind === "video" || /\.(?:mp4|m3u8|mpd|webm)(?:$|[?#])/i.test(url)) {
-      if (!out.media.includes(url)) out.media.push(url);
-    } else if (!out.embeds.includes(url)) out.embeds.push(url);
+  const source = unesc(String(html || ""));
+  // El contenedor publica los servidores en const videoTabs = [{tab_name,url,is_mp4,...}].
+  const tabsMatch = /(?:const|let|var)\s+videoTabs\s*=\s*(\[[\s\S]*?\])\s*;/i.exec(source);
+  if (tabsMatch) {
+    try { const tabs = JSON.parse(tabsMatch[1]); for (const tab of tabs) { if (!tab || !tab.url) continue; const url = absUrlFrom(tab.url, base); if (!/^https?:\/\//i.test(url)) continue; if (tab.is_mp4 === true || /\.(?:mp4|m3u8|mpd|webm)(?:$|[?#])/i.test(url)) { if (!out.media.includes(url)) out.media.push(url); } else if (!out.embeds.includes(url)) out.embeds.push(url); } log("MyTsumi videoTabs", "pestañas", tabs.length, "media", out.media.length, "embeds", out.embeds.length); }
+    catch (e) { log("MyTsumi videoTabs parse falló", String((e && e.message) || e)); }
   }
+  const tags = source.match(/<(?:button|a)\b[^>]*>/gi) || [];
+  for (const tag of tags) { const raw = attr(tag, "data-player-url"); if (!raw) continue; const url = absUrlFrom(raw, base); if (!/^https?:\/\//i.test(url)) continue; const kind = attr(tag, "data-player-kind").toLowerCase(); if (kind === "video" || /\.(?:mp4|m3u8|mpd|webm)(?:$|[?#])/i.test(url)) { if (!out.media.includes(url)) out.media.push(url); } else if (!out.embeds.includes(url)) out.embeds.push(url); }
   return out;
 }
-
 function pageEmbeds(html) {
   const out = [];
   const source = unesc(html);
@@ -1225,10 +1236,15 @@ export async function resolve(ref) {
     if (/mytsumi\.com\/(?:container\.php|multiplayer\/options\.php)/i.test(e)) {
       if (left() < 6000) break;
       const lang = (/[?&]only=([A-Za-z]+)/.exec(e) || [])[1] || "";
-      const src = await containerSources(e, absUrlFrom(path, BASE + "/"));
+      let sourceUrl = e;
+      if (/mytsumi\.com\/multiplayer\/options\.php/i.test(e)) {
+        try { const optionsHtml = (await kino.fetch(e, { headers: { "User-Agent": UA, Referer: absUrlFrom(path, BASE + "/") }, timeoutMs: 8000 })).text(); const decodedContainer = mytsumiContainerUrl(optionsHtml, e); if (decodedContainer) { sourceUrl = decodedContainer; log("MyTsumi options puente", safeUrl(e), "=>", safeUrl(sourceUrl)); } else log("MyTsumi options sin azakuEncodedURL", safeUrl(e)); }
+        catch (err) { log("MyTsumi options fetch falló", String((err && err.message) || err)); }
+      }
+      const src = await containerSources(sourceUrl, absUrlFrom(path, BASE + "/"));
       src.media.forEach((u) => candidates.push({ url: u, media: true, origin: "media-del-contenedor", lang }));
       src.embeds.forEach((u) => { if (/mega\.nz|mega\.io/i.test(hostOf(u))) { log("fuente omitida", safeUrl(u), "MEGA no es compatible con Kino"); return; } candidates.push({ url: u, origin: "embed-del-contenedor", lang }); });
-      candidates.push({ url: e, container: true, origin: /options\.php/i.test(e) ? "opciones MyTsumi" : "contenedor", lang });
+      candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
   // Prioridad global: Archive.org primero (media directa), Bysekoze segundo,
