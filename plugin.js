@@ -901,7 +901,7 @@ async function resolveBysekoze(embed, site, label, headers) {
     };
     return {
       url: streamUrl,
-      label: (chosen.label + " · " + site.name).slice(0, 48),
+      label: ("Bysekoze · " + chosen.label + " · " + site.name).slice(0, 48),
       headers: streamHeaders,
       mime: /\.m3u8(?:$|[?#])/i.test(streamUrl) ? "application/x-mpegURL" : /\.mpd(?:$|[?#])/i.test(streamUrl) ? "application/dash+xml" : "video/mp4",
       expiresInSeconds: 300
@@ -1158,6 +1158,18 @@ export async function resolve(ref) {
   const left = () => 24000 - (T0() - started);
   ref = String(ref);
 
+  // Alternativas de media directa: no hacer fetch del MP4 como HTML (Archive.org puede superar 5 MB).
+  if (/^m\|/.test(ref)) {
+    const url = ref.slice(2);
+    const host = hostOf(url);
+    return {
+      url,
+      mime: mimeOf(url),
+      headers: { Referer: "https://mytsumi.com/", "User-Agent": UA },
+      label: /(^|\.)archive\.org$/.test(host) ? "Archive.org" : labelOf(url)
+    };
+  }
+
   // alternativa perezosa: v|<url del embed>
   if (/^v\|/.test(ref)) {
     const url = ref.slice(2);
@@ -1235,7 +1247,7 @@ export async function resolve(ref) {
   let primary = null; const lazy = [];
   for (const c of candidates) {
     if (c.container) continue;
-    if (primary) { lazy.push({ label: labelOf(c.url), ref: "v|" + c.url }); continue; }
+    if (primary) { lazy.push({ label: c.media ? (/archive\.org/i.test(hostOf(c.url)) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(hostOf(c.url)) ? "Bysekoze" : labelOf(c.url)), ref: (c.media ? "m|" : "v|") + c.url }); continue; }
     if (left() < 5000) break;
     try {
       primary = c.media ? { url: c.url, mime: mimeOf(c.url), headers: { Referer: "https://mytsumi.com/", "User-Agent": UA }, label: labelOf(c.url) } : await resolveEmbed(c.url, "https://mytsumi.com/");
