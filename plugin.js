@@ -68,7 +68,7 @@ function posterOf(u) { return u ? u.replace(/&#038;/g, "&") : undefined; }
 
 function badgesOf(text) {
   const out = [];
-  for (const b of ["Donghua", "Sin Censura", "ONA", "OVA", "Corto", "Blu-ray", "Especial", "Película"]) if (new RegExp("\\b" + b + "\\b", "i").test(text)) out.push(b);
+  for (const b of ["Donghua", "Sin Censura", "Maduro", "Ecchi", "ONA", "OVA", "Corto", "Blu-ray", "Especial", "Película"]) if (new RegExp("\\b" + b + "\\b", "i").test(text)) out.push(b);
   return out.slice(0, 3);
 }
 
@@ -139,7 +139,8 @@ function toItem(c, adult) {
   };
   if (c.rating) it.rating = c.rating;
   if (c.badges && c.badges.length) it.badges = c.badges;
-  if (adult && adult.has(c.slug)) it.adult = true;
+  if ((adult && adult.has(c.slug)) || (c.badges || []).some((b) => /^(sin censura|maduro)$/i.test(b))) it.adult = true;
+  if ((c.badges || []).some((b) => /^sin censura$/i.test(b)) && !(it.badges || []).some((b) => /^ecchi$/i.test(b))) it.badges = (it.badges || []).concat("Ecchi");
   return it;
 }
 async function toItems(cards) {
@@ -336,60 +337,61 @@ export async function search(q) {
 async function buildIndex() {
   let idx = [], done = 0;
   try {
-    const c = JSON.parse(kino.storage.get("idx2") || "null");
+    const c = JSON.parse(kino.storage.get("idx3") || "null");
     if (c) {
       idx = c.e.map((r) => ({ slug: r[0], title: r[1], poster: r[2] ? "https://i0.wp.com/animeyt.cc/wp-content/uploads/" + r[2] + "?resize=360%2C510&ssl=1" : undefined }));
       done = c.done;
     }
   } catch (e) {}
-  if (done >= 60) return idx;
 
+  // Siempre complementar el índice, incluso si la paginación general ya terminó.
+  // Estas secciones exponen títulos recientes/especiales que no siempre aparecen en /tv/page/N/.
   const known = new Set(idx.map((e) => e.slug));
-  // Complementar el archivo general con los géneros que pueden organizar títulos especiales.
-  // Se hace durante el primer llenado del índice y se deduplica por slug.
-  if (done === 0) {
-    const genres = await Promise.all(["/genres/hentai/", "/genres/erotica/"].map((p) =>
-      get(p, { timeoutMs: 7000 }).then((h) => parseCards(h)).catch(() => [])
-    ));
-    for (const cards of genres) for (const c of cards) {
-      if (c.kindPath !== "tv" || known.has(c.slug)) continue;
-      known.add(c.slug);
-      idx.push({ slug: c.slug, title: c.title, poster: c.poster });
-    }
+  const extras = await Promise.all(["/", "/anime/", "/genres/hentai/", "/genres/erotica/"].map((p) =>
+    get(p, { timeoutMs: 7000 }).then((h) => parseCards(h)).catch(() => [])
+  ));
+  for (const cards of extras) for (const c of cards) {
+    if (c.kindPath !== "tv" || known.has(c.slug)) continue;
+    known.add(c.slug);
+    idx.push({ slug: c.slug, title: c.title, poster: c.poster });
   }
 
-  const from = done + 1, to = from + 11;
-  const pages = [];
-  for (let p = from; p <= to; p++) pages.push(p);
-  const got = await Promise.all(pages.map(async (p) => {
-    const url = p === 1 ? "/tv/" : "/tv/page/" + p + "/";
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const html = await get(url, { timeoutMs: 9000 });
-        return { page: p, cards: parseCards(html), hasNext: new RegExp("/page/" + (p + 1) + "/").test(html) };
-      } catch (e) {}
-    }
-    return null;
-  }));
+  if (done < 60) {
+    const from = done + 1, to = from + 11;
+    const pages = [];
+    for (let p = from; p <= to; p++) pages.push(p);
+    const got = await Promise.all(pages.map(async (p) => {
+      const url = p === 1 ? "/tv/" : "/tv/page/" + p + "/";
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const html = await get(url, { timeoutMs: 9000 });
+          return { page: p, cards: parseCards(html), hasNext: new RegExp("/page/" + (p + 1) + "/").test(html) };
+        } catch (e) {}
+      }
+      return null;
+    }));
 
-  let contiguous = done;
-  let endReached = false;
-  for (let i = 0; i < got.length; i++) {
-    const result = got[i];
-    if (!result) break; // No saltar páginas fallidas: la siguiente búsqueda las reintentará.
-    contiguous = result.page;
-    if (!result.cards.length && !result.hasNext) {
-      endReached = true;
-      break;
+    let contiguous = done;
+    let endReached = false;
+    for (let i = 0; i < got.length; i++) {
+      const result = got[i];
+      if (!result) break;
+      contiguous = result.page;
+      if (!result.cards.length && !result.hasNext) {
+        endReached = true;
+        break;
+      }
+      for (const c of result.cards) if (c.kindPath === "tv" && !known.has(c.slug)) {
+        known.add(c.slug);
+        idx.push({ slug: c.slug, title: c.title, poster: c.poster });
+      }
     }
-    for (const c of result.cards) if (c.kindPath === "tv" && !known.has(c.slug)) {
-      known.add(c.slug);
-      idx.push({ slug: c.slug, title: c.title, poster: c.poster });
-    }
+    done = endReached ? 999 : contiguous;
   }
+
   try {
     const compact = idx.map((e) => [e.slug, e.title, ((e.poster || "").split("/wp-content/uploads/")[1] || "").split("?")[0]]);
-    kino.storage.set("idx2", JSON.stringify({ done: endReached ? 999 : contiguous, e: compact }), { ttlMs: 604800000 });
+    kino.storage.set("idx3", JSON.stringify({ done, e: compact }), { ttlMs: 604800000 });
   } catch (e) { log("idx no guardado", String(e)); }
   return idx;
 }
