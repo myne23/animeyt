@@ -106,9 +106,13 @@ eq(longLast.episodes[19].number, 170, "último bloque termina en episodio 170");
 const st = await p.resolve("e|/118225/anime/tensei-temporada-2-capitulo-3/");
 eq(st.url, "https://vd1.okcdn.ru/x.m3u8", "resolve ok.ru HLS");
 console.log("stream:", st.label, st.mime, "alts:", (st.alternatives||[]).length);
-for (const host of ["https://bysesukior.com/e/test", "https://mega.nz/embed/test", "https://player.abyssplayer.com/test"]) {
+for (const host of ["https://bysesukior.com/e/test", "https://mega.nz/embed/test"]) {
   const captured = await p.resolve("v|" + host);
   eq(captured.url, "https://cdn.example.test/captured.m3u8", "browser capture for " + new URL(host).hostname);
   eq(captured.mime, "application/x-mpegURL", "browser capture MIME for " + new URL(host).hostname);
 }
+const abyss = await p.resolve("v|https://player.abyssplayer.com/m27Fa0uPI");
+eq(abyss.external.protocol, "abyss", "Abyss uses external resolver protocol");
+eq(abyss.external.resolver, "com.myne23.abyssresolver", "Abyss names the companion app");
+eq(abyss.external.ref, "abyss:m27Fa0uPI:best:https%3A%2F%2Fmytsumi.com%2F", "Abyss ref encodes slug, quality and referer");
 console.log("TODO OK");
