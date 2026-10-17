@@ -1123,7 +1123,13 @@ function pageEmbeds(html) {
   const source = unesc(html);
   const add = (u) => {
     u = absUrlFrom(u, BASE + "/");
-    if (!u || /^about:/.test(u) || /ads|doubleclick/i.test(u)) return;
+    if (!u || /^about:/i.test(u)) return;
+    // No filtrar por "ads" en la URL completa: parámetros legítimos como /uploads/ contienen esa secuencia.
+    let filterUrl;
+    try { filterUrl = new URL(u); } catch (e) { return; }
+    const filterHost = filterUrl.hostname.toLowerCase();
+    if (/doubleclick|googlesyndication|googleadservices|adservice/i.test(filterHost) ||
+        /(?:^|\\/)ads?(?:\\/|\\.|$)/i.test(filterUrl.pathname)) return;
     let x;
     try { x = new URL(u); } catch (e) { return; }
     const h = x.hostname.replace(/^www\./i, "").toLowerCase();
