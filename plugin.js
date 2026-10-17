@@ -1109,11 +1109,38 @@ function harvestMytsumiPlayers(html, base) {
 
 function pageEmbeds(html) {
   const out = [];
-  const add = (u) => { u = absUrlFrom(u, BASE + "/"); if (u && !/^about:/.test(u) && !out.includes(u)) out.push(u); };
-  (unesc(html).match(/https?:\/\/(?:www\.)?mytsumi\.com\/container\.php\?[^\s"'<>\\]+/g) || []).forEach(add);
-  const re = /<iframe\b[^>]*>/gi; let m;
-  while ((m = re.exec(html))) for (const n of ["src", "data-src", "data-lazy-src"]) { const v = attr(m[0], n); if (v && !/ads|doubleclick/i.test(v)) add(v); }
-  (unesc(html).match(/https?:\/\/(?:[a-z0-9-]+\.)?ok\.ru\/videoembed\/\d+/g) || []).forEach(add);
+  const source = unesc(html);
+  const add = (u) => {
+    u = absUrlFrom(u, BASE + "/");
+    if (!u || /^about:/.test(u) || /ads|doubleclick/i.test(u)) return;
+    let x;
+    try { x = new URL(u); } catch (e) { return; }
+    const h = x.hostname.replace(/^www\./i, "").toLowerCase();
+    // MyTsumi puede aparecer como iframe real o como enlace <a> con el texto "iframe".
+    if (h === "mytsumi.com" && x.pathname === "/container.php" && x.searchParams.has("id")) {
+      if (!out.includes(u)) out.push(u);
+      return;
+    }
+    if (/^(?:[a-z0-9-]+\.)?ok\.ru$/i.test(h) && /\/videoembed\/\d+/.test(x.pathname)) {
+      if (!out.includes(u)) out.push(u);
+      return;
+    }
+    // Mantener la detección de iframes de los demás proveedores.
+    if (/\.(?:png|jpe?g|gif|webp|svg|css|js|ico|woff2?)(?:$|\?)/i.test(x.pathname)) return;
+    if (/(embed|\/e\/|\/v\/|player|video|iframe)/i.test(x.pathname) && !/animeyt\.cc|i0\.wp\.com/i.test(h)) {
+      if (!out.includes(u)) out.push(u);
+    }
+  };
+  const tagRe = /<(?:iframe|a|button|source)\b[^>]*>/gi;
+  let m;
+  while ((m = tagRe.exec(source))) {
+    for (const n of ["src", "data-src", "data-lazy-src", "href", "data-href", "data-url", "data-player-url"]) {
+      const v = attr(m[0], n);
+      if (v) add(v);
+    }
+  }
+  // Respaldo para URLs completas serializadas dentro de scripts o atributos escapados.
+  (source.match(/https?:\/\/[^\s"'<>\\]+/g) || []).forEach(add);
   return out;
 }
 
