@@ -1214,6 +1214,18 @@ export async function resolve(ref) {
       try {
         const playbackHtml = await get(playbackPath);
         const found = pageEmbeds(playbackHtml);
+        // Diagnóstico acotado: comprobar qué markup del reproductor entrega Kino,
+        // sin volcar el HTML completo ni cookies/tokens al log.
+        log("diagnóstico página película", playbackPath,
+          "chars", playbackHtml.length,
+          "mytsumi", /mytsumi/i.test(playbackHtml),
+          "options.php", /options\\?\.php|options\.php/i.test(playbackHtml),
+          "iframe", /<iframe\\b/i.test(playbackHtml),
+          "href", /href\\s*=/i.test(playbackHtml),
+          "videoTabs", /videoTabs/i.test(playbackHtml),
+          "azakuEncodedURL", /azakuEncodedURL/i.test(playbackHtml));
+        const myPos = playbackHtml.search(/mytsumi|options\\?\.php/i);
+        if (myPos >= 0) log("fragmento reproductor película", playbackHtml.slice(Math.max(0, myPos - 180), Math.min(playbackHtml.length, myPos + 420)).replace(/\\s+/g, " "));
         log("película enlace de reproducción", playbackPath, "embeds", found.length);
         if (found.length) {
           html = playbackHtml;
