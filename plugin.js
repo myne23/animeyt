@@ -219,7 +219,7 @@ function parseLatest(html) {
   return out;
 }
 
-async function home() {
+export async function home() {
   const [h, tv, mv] = await Promise.all([
     get("/"), get("/tv/").catch(() => ""), get("/pelicula/").catch(() => ""),
   ]);
@@ -245,7 +245,7 @@ function pageUrl(ref, page) {
   const base = p.replace(/\/page\/\d+\/?$/, "").replace(/\/?$/, "/");
   return (page > 1 ? base + "page/" + page + "/" : base) + (q ? "?" + q : "");
 }
-async function browse(ref, cursor) {
+export async function browse(ref, cursor) {
   const path = String(ref).replace(/^b\|/, "");
   const page = cursor ? parseInt(cursor, 10) || 1 : 1;
   const html = await get(pageUrl(path, page));
@@ -256,7 +256,7 @@ async function browse(ref, cursor) {
   return res;
 }
 
-async function categories() {
+export async function categories() {
   const tiles = [
     { id: "tv", title: "Anime TV", ref: "b|/tv/?tipo=tv" },
     { id: "pelicula", title: "Películas", ref: "b|/pelicula/" },
@@ -299,7 +299,7 @@ function labelSeasonDuplicates(cards) {
   });
 }
 
-async function search(q) {
+export async function search(q) {
   const text = String(q.q || "").trim();
   if (!text) return [];
   const enc = encodeURIComponent(text);
@@ -431,7 +431,7 @@ async function fetchEpisodeBlock(info, block) {
   return [];
 }
 
-async function episodes(ref) {
+export async function episodes(ref) {
   const rawRef = String(ref);
   const blockRef = /^pb\|([^|]+)\|(\d+)$/.exec(rawRef);
   const requestedBlock = blockRef ? parseInt(blockRef[2], 10) : 0;
@@ -703,7 +703,7 @@ function pageEmbeds(html) {
 }
 
 const T0 = () => Date.now();
-async function resolve(ref) {
+export async function resolve(ref) {
   const started = T0();
   const left = () => 24000 - (T0() - started);
   ref = String(ref);
@@ -767,5 +767,3 @@ async function resolve(ref) {
   return primary;
 }
 
-// ---------- exports ES module requeridos por Kino ----------
-export { search, home, browse, categories, episodes, resolve };
