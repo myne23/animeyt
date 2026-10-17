@@ -1219,7 +1219,16 @@ export async function resolve(ref) {
       candidates.push({ url: e, container: true, origin: /options\.php/i.test(e) ? "opciones MyTsumi" : "contenedor", lang });
     } else candidates.push({ url: e });
   }
-  const prio = (c) => (c.media ? 0 : /ok\.ru/i.test(c.url) ? 1 : c.container ? 9 : 5);
+  // Prioridad global de servidores: Bysekoze directo > OK.ru/Archive.org > resto.
+  // Se ordena por proveedor, no por si la URL parece media directa; así un MP4 genérico
+  // no desplaza a Bysekoze, OK.ru o Archive.org. Si una fuente falla, el bucle prueba la siguiente.
+  const prio = (c) => {
+    const h = hostOf(c.url);
+    if (c.container) return 99;
+    if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 0;
+    if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h) || /(^|\.)archive\.org$/.test(h)) return 10;
+    return 20;
+  };
   candidates.sort((a, b) => prio(a) - prio(b));
   log("candidatos de fuente", candidates.map((c, i) => (i + 1) + ":" + (c.origin || "iframe") + ":" + (c.media ? "media" : c.container ? "container" : "embed") + ":" + safeUrl(c.url) + (c.lang ? ":lang=" + c.lang : "")).join(" || ") || "(ninguno)");
 
