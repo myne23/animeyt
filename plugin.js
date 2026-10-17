@@ -1130,7 +1130,7 @@ function pageEmbeds(html) {
     // MyTsumi puede aparecer como iframe real o como enlace <a> con el texto "iframe".
     if (h === "mytsumi.com" &&
         ((x.pathname === "/container.php" && x.searchParams.has("id")) ||
-         (x.pathname === "/multiplayer/options.php" && x.searchParams.has("value") && x.searchParams.has("server")))) {
+         x.pathname === "/multiplayer/options.php")) {
       if (!out.includes(u)) out.push(u);
       return;
     }
