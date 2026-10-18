@@ -1159,19 +1159,24 @@ export async function resolve(ref) {
     return abyssExternal(url, sourcePage || "https://mytsumi.com/");
   }
 
-  if (/^v\\|/.test(ref)) {
+  if (/^v\|/.test(ref)) {
     const url = ref.slice(2);
-    if (/^(?:player\\.)?abyssplayer\\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
     // MEGA también debe delegarse al APK externo cuando se elige como alternativa,
     // no solo cuando queda como fuente principal.
-    if (/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(hostOf(url))) return megaExternal(url);
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(hostOf(url))) return megaExternal(url);
     // Como en donghuas-sub-es: si el usuario elige Filemoon manualmente,
     // permitir la captura de navegador incluso cuando el PoW HTTP agota el tiempo.
     return await resolveEmbed(url, BASE + "/", { allowBrowserOnPow: true });
   }
 
   const path = ref.replace(/^[a-z]\|/, "");
-  let html = await get(path);
+  // Kino puede entregar la ruta del episodio sin prefijo y/o como ruta relativa.
+  // Convertirla a URL absoluta antes de cualquier fetch evita invalid_request.
+  const pageUrl = /^https?:\/\//i.test(path)
+    ? path
+    : BASE + (path.startsWith("/") ? path : "/" + path);
+  let html = await get(pageUrl);
   let embeds = pageEmbeds(html);
   if (!embeds.length) {
     // Las fichas de películas enlazan a una ruta independiente /<id>/anime/<slug>/.
@@ -1233,11 +1238,11 @@ export async function resolve(ref) {
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
-    if (/(^|\\.)archive\\.org$/.test(h)) return 0;
-    if (/bysekoze\\.com$|bysesukior\\.com$|n1mwq\\.org$/.test(h)) return 10;
-    if (/(^|\\.)ok\\.ru$|odnoklassniki/i.test(h)) return 20;
-    if (/^(?:player\\.)?abyssplayer\\.com$/i.test(h)) return 30;
-    if (/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(h)) return 40;
+    if (/(^|\.)archive\.org$/.test(h)) return 0;
+    if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
+    if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 30;
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return 40;
     return 50;
   };
   candidates.sort((a, b) => prio(a) - prio(b));
