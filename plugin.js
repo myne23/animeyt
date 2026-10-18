@@ -926,7 +926,7 @@ function megaExternal(embed, referer) {
     throw kino.error("not_found", "El enlace MEGA no incluye la key de descifrado");
   }
   log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop() || "handle");
-  return { external: { protocol: "mega", resolver: "com.myne23.abyssresolver", ref: parsed.href } };
+  return { external: { protocol: "mega", resolver: "com.mmilew.abyssresolver", ref: parsed.href } };
 }
 
 function abyssExternal(embed, referer) {
@@ -942,7 +942,7 @@ function abyssExternal(embed, referer) {
   // Pass the exact embed URL: Abyss may use different path prefixes, so the app must not guess /embed/ or /e/.
   const ref = "abyss:" + encodeURIComponent(parsed.href) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
   log("AbyssPlayer: delegando al resolutor externo", slug);
-  return { external: { protocol: "abyss", resolver: "com.myne23.abyssresolver", ref } };
+  return { external: { protocol: "abyss", resolver: "com.mmilew.abyssresolver", ref } };
 }
 
 function abyssLazyRef(embed, referer) {
