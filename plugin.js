@@ -1230,6 +1230,9 @@ export async function resolve(ref) {
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
+    // En esta prueba MEGA va primero para forzar el handoff directo al servicio externo.
+    // Archive.org y las demás fuentes se conservan como alternativas de respaldo.
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return -10;
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
@@ -1261,6 +1264,14 @@ export async function resolve(ref) {
       // Archive.org, OK.ru, Bysekoze y demás como alternativas elegibles.
       primary = abyssExternal(c.url, "https://mytsumi.com/");
       log("AbyssPlayer: resolutor externo elegido como principal; conservando fuentes restantes");
+      continue;
+    }
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(hostOf(c.url))) {
+      // Kino no estaba abriendo el resolutor externo desde una alternativa perezosa.
+      // En la rama de prueba, MEGA se entrega como fuente principal; los demás servidores
+      // siguen disponibles como alternativas de respaldo.
+      primary = megaExternal(c.url);
+      log("MEGA: resolutor externo elegido como principal; conservando fuentes restantes");
       continue;
     }
     try {
