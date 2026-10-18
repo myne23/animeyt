@@ -926,7 +926,7 @@ function megaExternal(embed, referer) {
     throw kino.error("not_found", "El enlace MEGA no incluye la key de descifrado");
   }
   log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop() || "handle");
-  return { external: { protocol: "mega", ref: parsed.href } };
+  return { external: { protocol: "mega", resolver: "com.myne23.abyssresolver", ref: parsed.href } };
 }
 
 function abyssExternal(embed, referer) {
@@ -942,7 +942,7 @@ function abyssExternal(embed, referer) {
   // Pass the exact embed URL: Abyss may use different path prefixes, so the app must not guess /embed/ or /e/.
   const ref = "abyss:" + encodeURIComponent(parsed.href) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
   log("AbyssPlayer: delegando al resolutor externo", slug);
-  return { external: { protocol: "abyss", ref } };
+  return { external: { protocol: "abyss", resolver: "com.myne23.abyssresolver", ref } };
 }
 
 function abyssLazyRef(embed, referer) {
@@ -1313,9 +1313,6 @@ export async function resolve(ref) {
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
-    // Kino reliably dispatches externalResolve for the primary result, not every lazy alternative.
-    // Keep Abyss first so its installed companion app receives the protocol call.
-    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return -1;
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
