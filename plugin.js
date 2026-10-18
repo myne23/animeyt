@@ -1211,7 +1211,7 @@ export async function resolve(ref) {
     const h = hostOf(c.url);
     if (c.container) return 99;
     // Diagnóstico temporal: forzar Abyss como respuesta principal para probar el enlace externo de Kino.
-    if (/^player\\.abyssplayer\\.com$/i.test(h)) return -10;
+    if (/^player\.abyssplayer\.com$/i.test(h)) return -10;
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
