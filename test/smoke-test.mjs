@@ -41,7 +41,7 @@ const kino = {
   fetch: async (u) => {
     if (u.startsWith("https://animeyt.cc/wp-json/aniyt/v1/home/episodes?")) {
       latestEndpointCalls++;
-      const html = \`<article data-episode-id="118226"><a href="/118226/anime/tensei-temporada-2-capitulo-2/"><img src="data:image/svg+xml;base64,AA==" data-src="https://i0.wp.com/a2.jpg"> T2 EP 2</a><h3><a href="/118226/anime/tensei-temporada-2-capitulo-2/">Tensei</a></h3></article><article data-episode-id="118227"><a href="/118227/anime/tensei-temporada-2-capitulo-1/"><img data-src="https://i0.wp.com/a1.jpg"> T2 EP 1</a><h3><a href="/118227/anime/tensei-temporada-2-capitulo-1/">Tensei</a></h3></article>\`;
+      const html = `<article data-episode-id="118226"><a href="/118226/anime/tensei-temporada-2-capitulo-2/"><img src="data:image/svg+xml;base64,AA==" data-src="https://i0.wp.com/a2.jpg"> T2 EP 2</a><h3><a href="/118226/anime/tensei-temporada-2-capitulo-2/">Tensei</a></h3></article><article data-episode-id="118227"><a href="/118227/anime/tensei-temporada-2-capitulo-1/"><img data-src="https://i0.wp.com/a1.jpg"> T2 EP 1</a><h3><a href="/118227/anime/tensei-temporada-2-capitulo-1/">Tensei</a></h3></article>`;
       return { ok:true, status:200, url:u, text:()=>JSON.stringify({html,ids:["118226","118227"],has_more:false}) };
     }
     const t = pages[u] ?? pages[u.replace(/\?.*/, "")];
