@@ -1096,27 +1096,27 @@ function absUrlFrom(u, base) { try { return new URL(unesc(u), base).toString(); 
 function megaHandle(url) {
   try {
     const u = new URL(url);
-    if (!/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(u.hostname)) return "";
-    return (u.pathname.match(/\\/(?:embed|file)\\/([^/]+)/i) || [])[1] || "";
+    if (!/^(?:www\.)?mega\.(?:nz|io)$/i.test(u.hostname)) return "";
+    return (u.pathname.match(/\/(?:embed|file)\/([^/]+)/i) || [])[1] || "";
   } catch { return ""; }
 }
 function mytsumiMegaQuality(html, url) {
   const handle = megaHandle(url);
   if (!handle) return "";
   const source = unesc(String(html || ""));
-  const tags = source.match(/<(?:button|a)\\b[^>]*>/gi) || [];
+  const tags = source.match(/<(?:button|a)\b[^>]*>/gi) || [];
   for (const tag of tags) {
     const candidate = attr(tag, "data-player-url") || attr(tag, "href");
     if (!candidate || megaHandle(absUrlFrom(candidate, "https://mytsumi.com/")) !== handle) continue;
-    const match = /([0-9]{3,4})\\s*p/i.exec(attr(tag, "title") || "");
+    const match = /([0-9]{3,4})\s*p/i.exec(attr(tag, "title") || "");
     if (match) return match[1] + "p";
   }
-  const tabsMatch = /(?:const|let|var)\\s+videoTabs\\s*=\\s*(\\[[\\s\\S]*?\\])\\s*;/i.exec(source);
+  const tabsMatch = /(?:const|let|var)\s+videoTabs\s*=\s*(\[[\s\S]*?\])\s*;/i.exec(source);
   if (tabsMatch) {
     try {
       for (const tab of JSON.parse(tabsMatch[1])) {
         if (!tab || !tab.url || megaHandle(absUrlFrom(tab.url, "https://mytsumi.com/")) !== handle) continue;
-        const match = /([0-9]{3,4})\\s*p/i.exec(String(tab.title || tab.tab_name || tab.label || ""));
+        const match = /([0-9]{3,4})\s*p/i.exec(String(tab.title || tab.tab_name || tab.label || ""));
         if (match) return match[1] + "p";
       }
     } catch {}
