@@ -1313,6 +1313,9 @@ export async function resolve(ref) {
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
+    // Kino reliably dispatches externalResolve for the primary result, not every lazy alternative.
+    // Keep Abyss first so its installed companion app receives the protocol call.
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return -1;
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
