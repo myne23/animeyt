@@ -980,7 +980,7 @@ async function resolveEmbed(url, referer, options) {
     return resolveWithBrowser(url, referer);
   }
   // AbyssPlayer necesita descifrar la cabecera MP4 fuera del sandbox de Kino.
-  if (/^player\\.abyssplayer\\.com$/i.test(host)) return abyssExternal(url, referer);
+  if (/^player\.abyssplayer\.com$/i.test(host)) return abyssExternal(url, referer);
   return resolveGeneric(url, referer);
 }
 
