@@ -1030,6 +1030,7 @@ async function containerSources(cUrl, referer) {
     const quality = mytsumiMegaQuality(html, u);
     if (quality) megaQualities[u] = quality;
   }
+  found.qualities = megaQualities;
   if (playerFound.media.length || playerFound.embeds.length) {
     log("container botones MyTsumi", "media", describeUrls(playerFound.media), "embeds", describeUrls(playerFound.embeds));
   }
@@ -1300,7 +1301,7 @@ export async function resolve(ref) {
           if (seenMegaHandles.has(handle)) return;
           seenMegaHandles.add(handle);
         }
-        candidates.push({ url: u, origin: "embed-del-contenedor", lang, quality: megaQualities[u] || "" });
+        candidates.push({ url: u, origin: "embed-del-contenedor", lang, quality: (src.qualities && src.qualities[u]) || "" });
       });
       candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
