@@ -942,7 +942,7 @@ function abyssExternal(embed, referer) {
   // Pass the exact embed URL: Abyss may use different path prefixes, so the app must not guess /embed/ or /e/.
   const ref = "abyss:" + encodeURIComponent(parsed.href) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
   log("AbyssPlayer: delegando al resolutor externo", slug);
-  return { external: { protocol: "abyss", resolver: "com.mmilew.abyssresolver", ref } };
+  return { external: { protocol: "abyss", ref } };
 }
 
 function abyssLazyRef(embed, referer) {
