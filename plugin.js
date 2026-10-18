@@ -932,6 +932,21 @@ function abyssExternal(embed, referer) {
   return { external: { protocol: "abyss", ref } };
 }
 
+function megaExternal(embed) {
+  let parsed;
+  try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de MEGA inválida"); }
+  if (parsed.protocol !== "https:" || !/^(?:www\.)?mega\.(?:nz|io)$/i.test(parsed.hostname)) {
+    throw kino.error("not_found", "El enlace no pertenece a MEGA");
+  }
+  if (!/^\/(?:embed|file)\/[A-Za-z0-9_-]{6,32}\/?$/.test(parsed.pathname)) {
+    throw kino.error("not_found", "No se encontró el identificador del archivo MEGA");
+  }
+  // No reconstruir la URL: el fragmento #clave es necesario para descifrar el archivo.
+  const keyPresent = Boolean(parsed.hash && parsed.hash.length > 1);
+  log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop(), "key=" + (keyPresent ? "presente" : "ausente"));
+  return { external: { protocol: "mega", ref: parsed.href } };
+}
+
 function abyssLazyRef(embed, referer) {
   return "a|" + encodeURIComponent(embed) + "|" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
 }
@@ -964,6 +979,8 @@ async function resolveEmbed(url, referer, options) {
     catch (e) { log("Bysekoze HTML sin media; se probará navegador", String((e && e.message) || e)); }
     return resolveWithBrowser(url, referer);
   }
+  // Ambos proveedores requieren el servicio externo; no pasar sus embeds por el parser HTML genérico.
+  if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(host)) return megaExternal(url);
   // AbyssPlayer necesita descifrar la cabecera MP4 fuera del sandbox de Kino.
   if (/^player\.abyssplayer\.com$/i.test(host)) return abyssExternal(url, referer);
   return resolveGeneric(url, referer);
@@ -1027,6 +1044,8 @@ async function containerSources(cUrl, referer) {
     });
   }
   log("container total", "media", found.media.length, describeUrls(found.media), "embeds", found.embeds.length, describeUrls(found.embeds));
+  const megaLinks = found.embeds.filter((u) => /^(?:https:\/\/)?(?:www\.)?mega\.(?:nz|io)\//i.test(u));
+  if (megaLinks.length) log("MEGA enlaces del contenedor", megaLinks.map((u) => { try { const x = new URL(u); return x.origin + x.pathname + " key=" + (x.hash.length > 1 ? "presente" : "ausente"); } catch { return "URL MEGA inválida"; } }).join(" | "));
   return found;
 }
 function decodeBase64Url(value) {
