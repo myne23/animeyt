@@ -916,6 +916,19 @@ async function resolveBysekoze(embed, site, label, headers) {
   }
 }
 
+function megaExternal(embed, referer) {
+  let parsed;
+  try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de MEGA inválida"); }
+  if (parsed.protocol !== "https:" || !/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(parsed.hostname)) {
+    throw kino.error("not_found", "El enlace no pertenece a MEGA");
+  }
+  if (!/\\/(?:embed|file)\\//i.test(parsed.pathname) || !parsed.hash) {
+    throw kino.error("not_found", "El enlace MEGA no incluye la key de descifrado");
+  }
+  log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop() || "handle");
+  return { external: { protocol: "mega", ref: parsed.href } };
+}
+
 function abyssExternal(embed, referer) {
   let parsed;
   try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de Abyss inválida"); }
@@ -941,6 +954,8 @@ async function resolveEmbed(url, referer, options) {
   const host = hostOf(url);
   // Se preservan los resolutores que ya funcionan: OK.ru directo y archivos directos del contenedor.
   if (/(^|\.)ok\.ru$|odnoklassniki/i.test(host)) return resolveOk(url, referer);
+  // MEGA no expone un MP4 inspeccionable: delegar al servicio externo.
+  if (/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(host)) return megaExternal(url, referer);
   // Bysekoze/Filemoon: resolver HTTP específico (API, desafío y URL real) antes de la captura genérica.
   if (/bysekoze\.com|bysesukior\.com|n1mwq\.org/i.test(host)) {
     const started = T0();
@@ -1058,6 +1073,14 @@ function harvestMytsumiPlayers(html, base) {
   }
   const tags = source.match(/<(?:button|a)\b[^>]*>/gi) || [];
   for (const tag of tags) { const raw = attr(tag, "data-player-url"); if (!raw) continue; const url = absUrlFrom(raw, base); if (!/^https?:\/\//i.test(url)) continue; const kind = attr(tag, "data-player-kind").toLowerCase(); if (kind === "video" || /\.(?:mp4|m3u8|mpd|webm)(?:$|[?#])/i.test(url)) { if (!out.media.includes(url)) out.media.push(url); } else if (!out.embeds.includes(url)) out.embeds.push(url); }
+  // MyTsumi downloads panel: anchors contain mega.nz/file/HANDLE#KEY.
+  for (const tag of tags) {
+    if (!/mytsumi-download-button/i.test(attr(tag, "class"))) continue;
+    const raw = attr(tag, "href");
+    if (!raw || !/mega\\.(?:nz|io)\\/(?:file|embed)\\//i.test(raw)) continue;
+    const url = absUrlFrom(raw, base);
+    if (url && !out.embeds.includes(url)) out.embeds.push(url);
+  }
   return out;
 }
 function pageEmbeds(html) {
@@ -1075,6 +1098,11 @@ function pageEmbeds(html) {
     let x;
     try { x = new URL(u); } catch (e) { return; }
     const h = x.hostname.replace(/^www\./i, "").toLowerCase();
+    // MEGA tab/download links must be preserved with their #KEY fragment.
+    if (/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(h) && /\\/(?:embed|file)\\//i.test(x.pathname)) {
+      if (!out.includes(u)) out.push(u);
+      return;
+    }
     // MyTsumi puede aparecer como iframe real o como enlace <a> con el texto "iframe".
     if (h === "mytsumi.com" &&
         ((x.pathname === "/container.php" && x.searchParams.has("id")) ||
@@ -1142,6 +1170,7 @@ export async function resolve(ref) {
 
   if (/^v\|/.test(ref)) {
     const url = ref.slice(2);
+    if (/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(hostOf(url))) return megaExternal(url, "https://mytsumi.com/");
     if (/^(?:player\.)?abyssplayer\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
     // Como en donghuas-sub-es: si el usuario elige Filemoon manualmente,
     // permitir la captura de navegador incluso cuando el PoW HTTP agota el tiempo.
