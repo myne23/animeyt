@@ -106,11 +106,12 @@ eq(longLast.episodes[19].number, 170, "último bloque termina en episodio 170");
 const st = await p.resolve("e|/118225/anime/tensei-temporada-2-capitulo-3/");
 eq(st.url, "https://vd1.okcdn.ru/x.m3u8", "resolve ok.ru HLS");
 console.log("stream:", st.label, st.mime, "alts:", (st.alternatives||[]).length);
-for (const host of ["https://bysesukior.com/e/test", "https://mega.nz/embed/test"]) {
-  const captured = await p.resolve("v|" + host);
-  eq(captured.url, "https://cdn.example.test/captured.m3u8", "browser capture for " + new URL(host).hostname);
-  eq(captured.mime, "application/x-mpegURL", "browser capture MIME for " + new URL(host).hostname);
-}
+const captured = await p.resolve("v|https://bysesukior.com/e/test");
+eq(captured.url, "https://cdn.example.test/captured.m3u8", "browser capture for bysesukior.com");
+eq(captured.mime, "application/x-mpegURL", "browser capture MIME for bysesukior.com");
+const mega = await p.resolve("v|https://mega.nz/embed/ayxnkbRA#27Ymo-aIa5oxVtSIB8qotfVpYdu2GBv-zJpQ-7KjXWQ");
+eq(mega.external.protocol, "mega", "MEGA uses external resolver protocol");
+eq(mega.external.ref, "https://mega.nz/embed/ayxnkbRA#27Ymo-aIa5oxVtSIB8qotfVpYdu2GBv-zJpQ-7KjXWQ", "MEGA preserves handle and decryption key");
 const abyss = await p.resolve("v|https://player.abyssplayer.com/m27Fa0uPI");
 eq(abyss.external.protocol, "abyss", "Abyss uses external resolver protocol");
 eq(abyss.external.resolver, "com.myne23.abyssresolver", "Abyss names the companion app");
