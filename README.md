@@ -16,6 +16,12 @@ La prueba en Kino confirmó que los catálogos principales cargan y que la repro
   **último recurso** `kino.browser.capture`. Otros servidores quedan como alternativas ("Servidor").
 - Series 18+ (géneros hentai/erótica) se marcan `adult`.
 
+## Integración externa de Abyss (en preparación)
+
+La rama `feature/abyss-external-resolver` delega los embeds de Abyss al protocolo externo de Kino:
+`{ external: { protocol: "abyss", ref, resolver: "com.myne23.abyssresolver" } }`.
+La aplicación Android acompañante todavía debe construirse, probarse en un dispositivo y publicarse antes de integrar esta rama en `main`. Sin esa app instalada y autorizada, la reproducción de Abyss no funcionará. Las demás fuentes se conservan.
+
 ## Qué falta confirmar en la app (mirá `logcat` → KinoPlugin/animeyt, `debug: true`)
 1. Búsqueda: línea `search param X`. Si no aparece, usa el índice local.
 2. Resolve: el contenedor de mytsumi carga los servidores (Byse, Alpha, MEGA, OK, Epsilon, Abyss) por JS.

@@ -916,48 +916,24 @@ async function resolveBysekoze(embed, site, label, headers) {
   }
 }
 
-async function resolveAbyssPlayer(embed, referer) {
-  const page = await kino.fetch(embed, {
-    headers: { "User-Agent": UA, Referer: referer || BASE + "/" },
-    timeoutMs: 12000
-  });
-  if (!page.ok) throw new Error("AbyssPlayer HTTP " + page.status);
-  const html = page.text();
-  const start = html.indexOf('const datas = "');
-  if (start < 0) throw new Error("No se encontró const datas");
-  const valueStart = start + 'const datas = "'.length;
-  const valueEnd = html.indexOf('"', valueStart);
-  if (valueEnd < 0) throw new Error("Campo datas incompleto");
-  const packed = atob(html.slice(valueStart, valueEnd));
-  const data = JSON.parse(packed);
-  if (!data || typeof data.media !== "string" || !data.user_id || !data.slug || !data.md5_id) {
-    throw new Error("Faltan campos de identificación o media");
+function abyssExternal(embed, referer) {
+  let parsed;
+  try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de Abyss inválida"); }
+  if (parsed.protocol !== "https:" || parsed.hostname !== "player.abyssplayer.com") {
+    throw kino.error("not_found", "El enlace no pertenece a AbyssPlayer");
   }
-  const key = kino.crypto.hash("md5", String(data.user_id) + ":" + String(data.slug) + ":" + String(data.md5_id));
-  const plaintext = kino.crypto.decrypt("aes-256-ctr", {
-    key, iv: key.slice(0, 16), data: btoa(data.media),
-    inputEncoding: "base64", outputEncoding: "utf8"
-  });
-  const payload = JSON.parse(plaintext);
-  const sources = payload && payload.mp4 && payload.mp4.sources;
-  if (!Array.isArray(sources) || !sources.length) throw new Error("No se encontraron fuentes MP4");
-  const candidates = sources.filter(x => x && x.url && x.path);
-  if (!candidates.length) throw new Error("Fuentes sin URL o path");
-  candidates.sort((a, b) => {
-    const quality = x => Number((String(x.quality || x.label || x.path).match(/(\d{3,4})\s*p/i) || [])[1]) || 0;
-    return quality(b) - quality(a);
-  });
-  const source = candidates[0];
-  const url = String(source.url).replace(/\/$/, "") + "/" + String(source.path).replace(/^\//, "");
-  const parsed = new URL(url);
-  if (parsed.protocol !== "https:") throw new Error("La fuente no usa HTTPS");
-  log("AbyssPlayer resuelto por HTTP", parsed.hostname, "calidad", String(source.quality || source.label || "auto"));
-  return {
-    url: parsed.href,
-    label: ("AbyssPlayer · " + String(source.quality || source.label || "MP4")).slice(0, 48),
-    headers: { "User-Agent": UA, Referer: "https://player.abyssplayer.com/", Origin: "https://player.abyssplayer.com" },
-    mime: "video/mp4", expiresInSeconds: 300
-  };
+  const slug = parsed.pathname.split("/").filter(Boolean).pop() || "";
+  if (!/^[A-Za-z0-9_-]{4,120}$/.test(slug)) {
+    throw kino.error("not_found", "No se encontró el identificador del reproductor Abyss");
+  }
+  // Pass the exact embed URL: Abyss may use different path prefixes, so the app must not guess /embed/ or /e/.
+  const ref = "abyss:" + encodeURIComponent(parsed.href) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
+  log("AbyssPlayer: delegando al resolutor externo", slug);
+  return { external: { protocol: "abyss", ref } };
+}
+
+function abyssLazyRef(embed, referer) {
+  return "a|" + encodeURIComponent(embed) + "|" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
 }
 
 async function resolveEmbed(url, referer, options) {
@@ -988,42 +964,8 @@ async function resolveEmbed(url, referer, options) {
     catch (e) { log("Bysekoze HTML sin media; se probará navegador", String((e && e.message) || e)); }
     return resolveWithBrowser(url, referer);
   }
-  // AbyssPlayer: primero comprobar si el reproductor real expone HLS reproducible.
-  // Algunos enlaces MP4 directos resuelven correctamente pero su cabecera no es compatible con el player.
-  if (/abyssplayer\.com/i.test(host)) {
-    let captured = null;
-    try {
-      captured = await resolveWithBrowser(url, referer);
-      const capturedUrl = String(captured && captured.url || "");
-      const capturedMime = String(captured && captured.mime || "");
-      if (/\.m3u8(?:$|[?#])/i.test(capturedUrl) || /mpegurl/i.test(capturedMime)) {
-        log("AbyssPlayer: captura del reproductor encontró HLS; priorizo esa fuente");
-        return captured;
-      }
-      if (capturedUrl && !/\/sora\//i.test(capturedUrl)) {
-        log("AbyssPlayer: captura del reproductor encontró una fuente alternativa", safeUrl(capturedUrl));
-      } else {
-        log("AbyssPlayer: captura sin HLS reproducible; pruebo resolver HTTP");
-        captured = null;
-      }
-    } catch (e) {
-      log("AbyssPlayer captura del reproductor sin fuente utilizable", String((e && e.message) || e));
-    }
-    try {
-      const direct = await resolveAbyssPlayer(url, referer);
-      if (captured && captured.url && captured.url !== direct.url) {
-        log("AbyssPlayer: pruebo la URL capturada distinta del MP4 directo");
-        return captured;
-      }
-      return direct;
-    } catch (e) {
-      log("AbyssPlayer HTTP directo falló; pruebo resolver genérico", String((e && e.message) || e));
-    }
-    if (captured) return captured;
-    try { return await resolveGeneric(url, referer); }
-    catch (e) { log("AbyssPlayer genérico agotado; se probará navegador", String((e && e.message) || e)); }
-    return resolveWithBrowser(url, referer);
-  }
+  // AbyssPlayer necesita descifrar la cabecera MP4 fuera del sandbox de Kino.
+  if (/^player\\.abyssplayer\\.com$/i.test(host)) return abyssExternal(url, referer);
   return resolveGeneric(url, referer);
 }
 
@@ -1191,8 +1133,16 @@ export async function resolve(ref) {
   }
 
   // alternativa perezosa: v|<url del embed>
+  if (/^a\|/.test(ref)) {
+    const parts = ref.split("|");
+    let url = "", sourcePage = "";
+    try { url = decodeURIComponent(parts[1] || ""); sourcePage = decodeURIComponent(parts[2] || ""); } catch {}
+    return abyssExternal(url, sourcePage || "https://mytsumi.com/");
+  }
+
   if (/^v\|/.test(ref)) {
     const url = ref.slice(2);
+    if (/^player\.abyssplayer\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
     // Como en donghuas-sub-es: si el usuario elige Filemoon manualmente,
     // permitir la captura de navegador incluso cuando el PoW HTTP agota el tiempo.
     return await resolveEmbed(url, BASE + "/", { allowBrowserOnPow: true });
@@ -1251,12 +1201,13 @@ export async function resolve(ref) {
       }
       const src = await containerSources(sourceUrl, absUrlFrom(path, BASE + "/"));
       src.media.forEach((u) => candidates.push({ url: u, media: true, origin: "media-del-contenedor", lang }));
-      src.embeds.forEach((u) => { if (/mega\.nz|mega\.io/i.test(hostOf(u))) { log("fuente omitida", safeUrl(u), "MEGA no es compatible con Kino"); return; } candidates.push({ url: u, origin: "embed-del-contenedor", lang }); });
+      // Conservar MEGA como alternativa visible para probar la futura integración del resolutor.
+      src.embeds.forEach((u) => candidates.push({ url: u, origin: "embed-del-contenedor", lang }));
       candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
-  // Prioridad global: Archive.org primero (media directa), Bysekoze segundo,
-  // OK.ru después y el resto de servidores al final. Si una fuente falla, se prueban las siguientes.
+  // Prioridad global: Archive.org primero, Bysekoze segundo, OK.ru tercero;
+  // AbyssPlayer y MEGA quedan como alternativas seleccionables cuando estén presentes.
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
@@ -1271,8 +1222,28 @@ export async function resolve(ref) {
   let primary = null; const lazy = [];
   for (const c of candidates) {
     if (c.container) continue;
-    if (primary) { lazy.push({ label: c.media ? (/archive\.org/i.test(hostOf(c.url)) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(hostOf(c.url)) ? "Bysekoze" : labelOf(c.url)), ref: (c.media ? "d|" : "v|") + c.url }); continue; }
+    if (primary) {
+      const h = hostOf(c.url);
+      // Usar la ruta normal de Kino para que la selección manual vuelva a resolve()
+      // y desde ahí delegue al resolutor externo con protocol="abyss".
+      if (/^player\.abyssplayer\.com$/i.test(h)) {
+        lazy.push({ label: "AbyssPlayer", ref: "v|" + c.url });
+        log("AbyssPlayer: alternativa registrada mediante resolve(ref)");
+        continue;
+      }
+      const ref = (c.media ? "d|" : "v|") + c.url;
+      lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : /mega\.nz|mega\.io/i.test(h) ? "MEGA" : labelOf(c.url)), ref });
+      continue;
+    }
     if (left() < 5000) break;
+    if (/^player\.abyssplayer\.com$/i.test(hostOf(c.url))) {
+      // Mantener Abyss como fuente inicial para que Kino invoque el resolutor externo
+      // (y muestre su consentimiento), pero seguir recorriendo candidatos para adjuntar
+      // Archive.org, OK.ru, Bysekoze y demás como alternativas elegibles.
+      primary = abyssExternal(c.url, "https://mytsumi.com/");
+      log("AbyssPlayer: resolutor externo elegido como principal; conservando fuentes restantes");
+      continue;
+    }
     try {
       primary = c.media ? { url: c.url, mime: mimeOf(c.url), headers: { Referer: "https://mytsumi.com/", "User-Agent": UA }, label: labelOf(c.url) } : await resolveEmbed(c.url, "https://mytsumi.com/");
       log("fuente resuelta", c.origin || "iframe", "embed", safeUrl(c.url), "nombre", labelOf(c.url), "media final", safeUrl(primary.url), "tipo", primary.mime || mimeOf(primary.url));
