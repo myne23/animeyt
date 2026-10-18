@@ -1011,11 +1011,13 @@ async function containerSources(cUrl, referer) {
         }
       } catch {}
     }
+    // Si el envoltorio no contiene un iframe reconocible, conservar el método anterior:
+    // abrir container.php con open=1, manteniendo id/lang/only originales.
     if (iframeSrc) open = iframeSrc;
     else if (/[?&]open=1(?:&|$)/.test(cUrl)) open = cUrl;
-    else log("container iframe open=1 no encontrado; se analiza envoltorio sin inventar parámetros");
+    else open = cUrl + (cUrl.includes("?") ? "&" : "?") + "open=1";
     if (iframeSrc) log("container iframe real", safeUrl(cUrl), "=>", safeUrl(open));
-    else if (open === cUrl) log("container URL", "usando URL recibida sin reconstruir open=1");
+    else if (open !== cUrl) log("container fallback", "open=1 añadido conservando filtros", safeUrl(open));
     if (open !== cUrl || /[?&]open=1(?:&|$)/.test(open)) {
       html = (await kino.fetch(open, { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text();
     } else html = wrapper;
