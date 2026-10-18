@@ -1159,9 +1159,12 @@ export async function resolve(ref) {
     return abyssExternal(url, sourcePage || "https://mytsumi.com/");
   }
 
-  if (/^v\|/.test(ref)) {
+  if (/^v\\|/.test(ref)) {
     const url = ref.slice(2);
-    if (/^(?:player\.)?abyssplayer\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
+    if (/^(?:player\\.)?abyssplayer\\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
+    // MEGA también debe delegarse al APK externo cuando se elige como alternativa,
+    // no solo cuando queda como fuente principal.
+    if (/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(hostOf(url))) return megaExternal(url);
     // Como en donghuas-sub-es: si el usuario elige Filemoon manualmente,
     // permitir la captura de navegador incluso cuando el PoW HTTP agota el tiempo.
     return await resolveEmbed(url, BASE + "/", { allowBrowserOnPow: true });
