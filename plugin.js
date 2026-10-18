@@ -995,7 +995,7 @@ async function containerSources(cUrl, referer) {
   let open = cUrl;
   try {
     const wrapper = (await kino.fetch(cUrl, { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text();
-    const iframeTags = wrapper.match(/<iframe\\b[^>]*>/gi) || [];
+    const iframeTags = wrapper.match(/<iframe\b[^>]*>/gi) || [];
     let iframeSrc = "";
     for (const tag of iframeTags) {
       const rawSrc = attr(tag, "src") || attr(tag, "data-src");
@@ -1003,8 +1003,8 @@ async function containerSources(cUrl, referer) {
       const candidate = absUrlFrom(rawSrc, cUrl);
       try {
         const parsed = new URL(candidate);
-        if (parsed.hostname.replace(/^www\\./i, "").toLowerCase() === "mytsumi.com" &&
-            /\\/container\\.php$/i.test(parsed.pathname) && parsed.searchParams.has("id") &&
+        if (parsed.hostname.replace(/^www\./i, "").toLowerCase() === "mytsumi.com" &&
+            /\/container\.php$/i.test(parsed.pathname) && parsed.searchParams.has("id") &&
             parsed.searchParams.get("open") === "1") {
           iframeSrc = parsed.toString();
           break;
