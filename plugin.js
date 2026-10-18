@@ -1,5 +1,5 @@
 /// <reference path="./kino.d.ts" />
-// AnimeYT para Kino (apiVersion 6). Parseo por regex sobre anclas: no depende de clases CSS.
+// AnimeYT para Kino (apiVersion 11). Parseo por regex sobre anclas: no depende de clases CSS.
 // Catálogo/episodios: HTML del sitio (WordPress, tema "aniyt").
 // Reproducción: iframe mytsumi.com/container.php -> servidores -> resolutores directos;
 // kino.browser.capture solo como último recurso.
