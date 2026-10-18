@@ -1223,7 +1223,14 @@ export async function resolve(ref) {
     if (c.container) continue;
     if (primary) {
       const h = hostOf(c.url);
-      const ref = /^player\.abyssplayer\.com$/i.test(h) ? abyssLazyRef(c.url, "https://mytsumi.com/") : (c.media ? "d|" : "v|") + c.url;
+      // Prueba: pasar Abyss directamente como alternativa externa, sin una segunda llamada resolve(ref).
+      if (/^player\.abyssplayer\.com$/i.test(h)) {
+        const delegated = abyssExternal(c.url, "https://mytsumi.com/");
+        lazy.push({ label: "AbyssPlayer", external: delegated.external });
+        log("AbyssPlayer: alternativa externa directa registrada");
+        continue;
+      }
+      const ref = (c.media ? "d|" : "v|") + c.url;
       lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : labelOf(c.url)), ref });
       continue;
     }
