@@ -919,7 +919,7 @@ async function resolveBysekoze(embed, site, label, headers) {
 function abyssExternal(embed, referer) {
   let parsed;
   try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de Abyss inválida"); }
-  if (parsed.protocol !== "https:" || parsed.hostname !== "player.abyssplayer.com") {
+  if (parsed.protocol !== "https:" || !/^(?:player\.)?abyssplayer\.com$/i.test(parsed.hostname)) {
     throw kino.error("not_found", "El enlace no pertenece a AbyssPlayer");
   }
   const slug = parsed.pathname.split("/").filter(Boolean).pop() || "";
