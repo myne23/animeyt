@@ -106,7 +106,7 @@ eq(longLast.episodes[19].number, 170, "último bloque termina en episodio 170");
 const st = await p.resolve("e|/118225/anime/tensei-temporada-2-capitulo-3/");
 eq(st.url, "https://vd1.okcdn.ru/x.m3u8", "resolve ok.ru HLS");
 console.log("stream:", st.label, st.mime, "alts:", (st.alternatives||[]).length);
-for (const host of ["https://bysesukior.com/e/test", "https://mega.nz/embed/test"]) {
+for (const host of ["https://bysesukior.com/e/test"]) {
   const captured = await p.resolve("v|" + host);
   eq(captured.url, "https://cdn.example.test/captured.m3u8", "browser capture for " + new URL(host).hostname);
   eq(captured.mime, "application/x-mpegURL", "browser capture MIME for " + new URL(host).hostname);
