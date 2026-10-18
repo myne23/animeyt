@@ -114,7 +114,7 @@ eq(mega.external.protocol, "mega", "MEGA uses external resolver protocol");
 eq(mega.external.ref, "https://mega.nz/embed/ayxnkbRA#27Ymo-aIa5oxVtSIB8qotfVpYdu2GBv-zJpQ-7KjXWQ", "MEGA preserves handle and decryption key");
 const abyss = await p.resolve("v|https://player.abyssplayer.com/m27Fa0uPI");
 eq(abyss.external.protocol, "abyss", "Abyss uses external resolver protocol");
-eq(abyss.external.resolver, "com.myne23.abyssresolver", "Abyss names the companion app");
+eq(abyss.external.resolver, undefined, "Abyss keeps the existing protocol-only resolver contract");
 eq(abyss.external.ref, "abyss:https%3A%2F%2Fplayer.abyssplayer.com%2Fm27Fa0uPI:best:https%3A%2F%2Fmytsumi.com%2F", "Abyss ref preserves the exact embed URL, quality and referer");
 const abyssMovie = await p.resolve("v|https://abyssplayer.com/7XMhdjzJz");
 eq(abyssMovie.external.protocol, "abyss", "Abyss movie apex hostname uses external resolver");
