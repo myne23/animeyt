@@ -1201,17 +1201,16 @@ export async function resolve(ref) {
       }
       const src = await containerSources(sourceUrl, absUrlFrom(path, BASE + "/"));
       src.media.forEach((u) => candidates.push({ url: u, media: true, origin: "media-del-contenedor", lang }));
-      src.embeds.forEach((u) => { if (/mega\.nz|mega\.io/i.test(hostOf(u))) { log("fuente omitida", safeUrl(u), "MEGA no es compatible con Kino"); return; } candidates.push({ url: u, origin: "embed-del-contenedor", lang }); });
+      // Conservar MEGA como alternativa visible para probar la futura integración del resolutor.
+      src.embeds.forEach((u) => candidates.push({ url: u, origin: "embed-del-contenedor", lang }));
       candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
-  // Prioridad global: Archive.org primero (media directa), Bysekoze segundo,
-  // OK.ru después y el resto de servidores al final. Si una fuente falla, se prueban las siguientes.
+  // Prioridad global: Archive.org primero, Bysekoze segundo, OK.ru tercero;
+  // AbyssPlayer y MEGA quedan como alternativas seleccionables cuando estén presentes.
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
-    // Diagnóstico temporal: forzar Abyss como respuesta principal para probar el enlace externo de Kino.
-    if (/^player\.abyssplayer\.com$/i.test(h)) return -10;
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
@@ -1233,7 +1232,7 @@ export async function resolve(ref) {
         continue;
       }
       const ref = (c.media ? "d|" : "v|") + c.url;
-      lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : labelOf(c.url)), ref });
+      lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : /mega\.nz|mega\.io/i.test(h) ? "MEGA" : labelOf(c.url)), ref });
       continue;
     }
     if (left() < 5000) break;
