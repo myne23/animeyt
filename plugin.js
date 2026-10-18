@@ -1208,9 +1208,13 @@ export async function resolve(ref) {
   }
   // Prioridad global: Archive.org primero, Bysekoze segundo, OK.ru tercero;
   // AbyssPlayer y MEGA quedan como alternativas seleccionables cuando estén presentes.
+  const moviePath = /\/pelicula\//i.test(path);
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
+    // En películas, Abyss debe ser principal: Kino puede no volver a enlazar
+    // el servicio externo cuando Abyss queda detrás de una fuente directa.
+    if (moviePath && /^(?:player\.)?abyssplayer\.com$/i.test(h)) return -1;
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
