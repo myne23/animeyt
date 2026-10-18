@@ -118,4 +118,7 @@ eq(abyss.external.ref, "abyss:https%3A%2F%2Fplayer.abyssplayer.com%2Fm27Fa0uPI:b
 const abyssMovie = await p.resolve("v|https://abyssplayer.com/7XMhdjzJz");
 eq(abyssMovie.external.protocol, "abyss", "Abyss movie apex hostname uses external resolver");
 eq(abyssMovie.external.ref, "abyss:https%3A%2F%2Fabyssplayer.com%2F7XMhdjzJz:best:https%3A%2F%2Fmytsumi.com%2F", "Abyss movie ref preserves apex hostname and slug");
+const megaAlt = await p.resolve("v|https://mega.nz/embed/UMVl2QTL#C5ZttS4mK21yGseLGkA_TVxDWlYnbSnaSLFPQrosffI");
+eq(megaAlt.external.protocol, "mega", "MEGA alternativa usa el resolutor externo");
+eq(megaAlt.external.ref, "https://mega.nz/embed/UMVl2QTL#C5ZttS4mK21yGseLGkA_TVxDWlYnbSnaSLFPQrosffI", "MEGA alternativa conserva URL y clave");
 console.log("TODO OK");
