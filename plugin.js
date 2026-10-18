@@ -926,7 +926,7 @@ function megaExternal(embed, referer) {
     throw kino.error("not_found", "El enlace MEGA no incluye la key de descifrado");
   }
   log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop() || "handle");
-  return { external: { protocol: "mega", resolver: "com.mmilew.abyssresolver", ref: parsed.href } };
+  return { external: { protocol: "mega", ref: parsed.href } };
 }
 
 function abyssExternal(embed, referer) {
