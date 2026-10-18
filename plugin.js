@@ -989,12 +989,38 @@ async function containerSources(cUrl, referer) {
   const found = { media: [], embeds: [] };
   const merge = (h) => { h.media.forEach((u) => !found.media.includes(u) && found.media.push(u)); h.embeds.forEach((u) => !found.embeds.includes(u) && found.embeds.push(u)); };
   const idm = /[?&]id=([^&]+)/.exec(cUrl); const cid = idm ? idm[1] : "";
-  // Conservar id, idioma y filtros del servidor tal como los usa el navegador real.
-  // Solo añadir open=1 si todavía no está presente.
-  const open = /[?&]open=1(?:&|$)/.test(cUrl) ? cUrl : cUrl + (cUrl.includes("?") ? "&" : "?") + "open=1";
-  log("container URL", "open=1", /[?&]open=1(?:&|$)/.test(open) ? "sí" : "no", "filtros", /[?&]lang=/.test(open) ? "lang presente" : "lang ausente", /[?&]only=/.test(open) ? "only presente" : "only ausente");
+  // Primero pedir el envoltorio tal cual. El HTML contiene el iframe real con open=1;
+  // usar su src exacto conserva lang/only y evita reconstruir la URL a mano.
   let html = "";
-  try { html = (await kino.fetch(open.replace("?&", "?"), { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text(); } catch (e) { log("container fetch", String(e)); }
+  let open = cUrl;
+  try {
+    const wrapper = (await kino.fetch(cUrl, { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text();
+    const iframeTags = wrapper.match(/<iframe\\b[^>]*>/gi) || [];
+    let iframeSrc = "";
+    for (const tag of iframeTags) {
+      const rawSrc = attr(tag, "src") || attr(tag, "data-src");
+      if (!rawSrc) continue;
+      const candidate = absUrlFrom(rawSrc, cUrl);
+      try {
+        const parsed = new URL(candidate);
+        if (parsed.hostname.replace(/^www\\./i, "").toLowerCase() === "mytsumi.com" &&
+            /\\/container\\.php$/i.test(parsed.pathname) && parsed.searchParams.has("id") &&
+            parsed.searchParams.get("open") === "1") {
+          iframeSrc = parsed.toString();
+          break;
+        }
+      } catch {}
+    }
+    if (iframeSrc) open = iframeSrc;
+    else if (/[?&]open=1(?:&|$)/.test(cUrl)) open = cUrl;
+    else log("container iframe open=1 no encontrado; se analiza envoltorio sin inventar parámetros");
+    if (iframeSrc) log("container iframe real", safeUrl(cUrl), "=>", safeUrl(open));
+    else if (open === cUrl) log("container URL", "usando URL recibida sin reconstruir open=1");
+    if (open !== cUrl || /[?&]open=1(?:&|$)/.test(open)) {
+      html = (await kino.fetch(open, { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text();
+    } else html = wrapper;
+  } catch (e) { log("container fetch", String((e && e.message) || e)); }
+  log("container filtros", "lang", /[?&]lang=/.test(open) ? "presente" : "ausente", "only", /[?&]only=/.test(open) ? "presente" : "ausente");
   const htmlFound = harvest(html);
   merge(htmlFound);
   const playerFound = harvestMytsumiPlayers(html, open);
