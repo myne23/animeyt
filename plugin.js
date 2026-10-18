@@ -1025,6 +1025,11 @@ async function containerSources(cUrl, referer) {
   merge(htmlFound);
   const playerFound = harvestMytsumiPlayers(html, open);
   merge(playerFound);
+  const megaQualities = {};
+  for (const u of playerFound.embeds) {
+    const quality = mytsumiMegaQuality(html, u);
+    if (quality) megaQualities[u] = quality;
+  }
   if (playerFound.media.length || playerFound.embeds.length) {
     log("container botones MyTsumi", "media", describeUrls(playerFound.media), "embeds", describeUrls(playerFound.embeds));
   }
@@ -1088,6 +1093,37 @@ function absUrlFrom(u, base) { try { return new URL(unesc(u), base).toString(); 
 
 // MyTsumi publica los servidores del reproductor como botones con data-player-url.
 // Extraerlos explícitamente evita depender de que la URL aparezca en un script o texto suelto.
+function megaHandle(url) {
+  try {
+    const u = new URL(url);
+    if (!/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(u.hostname)) return "";
+    return (u.pathname.match(/\\/(?:embed|file)\\/([^/]+)/i) || [])[1] || "";
+  } catch { return ""; }
+}
+function mytsumiMegaQuality(html, url) {
+  const handle = megaHandle(url);
+  if (!handle) return "";
+  const source = unesc(String(html || ""));
+  const tags = source.match(/<(?:button|a)\\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const candidate = attr(tag, "data-player-url") || attr(tag, "href");
+    if (!candidate || megaHandle(absUrlFrom(candidate, "https://mytsumi.com/")) !== handle) continue;
+    const match = /([0-9]{3,4})\\s*p/i.exec(attr(tag, "title") || "");
+    if (match) return match[1] + "p";
+  }
+  const tabsMatch = /(?:const|let|var)\\s+videoTabs\\s*=\\s*(\\[[\\s\\S]*?\\])\\s*;/i.exec(source);
+  if (tabsMatch) {
+    try {
+      for (const tab of JSON.parse(tabsMatch[1])) {
+        if (!tab || !tab.url || megaHandle(absUrlFrom(tab.url, "https://mytsumi.com/")) !== handle) continue;
+        const match = /([0-9]{3,4})\\s*p/i.exec(String(tab.title || tab.tab_name || tab.label || ""));
+        if (match) return match[1] + "p";
+      }
+    } catch {}
+  }
+  return "";
+}
+
 function harvestMytsumiPlayers(html, base) {
   const out = { media: [], embeds: [] };
   const source = unesc(String(html || ""));
@@ -1257,7 +1293,15 @@ export async function resolve(ref) {
       const src = await containerSources(sourceUrl, absUrlFrom(path, BASE + "/"));
       src.media.forEach((u) => candidates.push({ url: u, media: true, origin: "media-del-contenedor", lang }));
       // Conservar MEGA como alternativa visible para probar la futura integración del resolutor.
-      src.embeds.forEach((u) => candidates.push({ url: u, origin: "embed-del-contenedor", lang }));
+      const seenMegaHandles = new Set();
+      src.embeds.forEach((u) => {
+        const handle = megaHandle(u);
+        if (handle) {
+          if (seenMegaHandles.has(handle)) return;
+          seenMegaHandles.add(handle);
+        }
+        candidates.push({ url: u, origin: "embed-del-contenedor", lang, quality: megaQualities[u] || "" });
+      });
       candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
@@ -1287,7 +1331,7 @@ export async function resolve(ref) {
         continue;
       }
       const ref = (c.media ? "d|" : "v|") + c.url;
-      lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : /mega\.nz|mega\.io/i.test(h) ? "MEGA" : labelOf(c.url)), ref });
+      lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : /mega\.nz|mega\.io/i.test(h) ? ("MEGA" + (c.quality ? " · " + c.quality : "")) : labelOf(c.url)), ref });
       continue;
     }
     if (left() < 5000) break;
