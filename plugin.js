@@ -916,7 +916,7 @@ async function resolveBysekoze(embed, site, label, headers) {
   }
 }
 
-const ABYSS_RESOLVER = "com.myne23.abyssresolver";
+const ABYSS_RESOLVER = "com.mmilew.kinoresolvers";
 
 function abyssExternal(embed, referer) {
   let parsed;
