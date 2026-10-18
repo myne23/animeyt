@@ -1237,7 +1237,14 @@ export async function resolve(ref) {
       continue;
     }
     if (left() < 5000) break;
-    if (/^player\.abyssplayer\.com$/i.test(hostOf(c.url))) return abyssExternal(c.url, "https://mytsumi.com/");
+    if (/^player\.abyssplayer\.com$/i.test(hostOf(c.url))) {
+      // Mantener Abyss como fuente inicial para que Kino invoque el resolutor externo
+      // (y muestre su consentimiento), pero seguir recorriendo candidatos para adjuntar
+      // Archive.org, OK.ru, Bysekoze y demás como alternativas elegibles.
+      primary = abyssExternal(c.url, "https://mytsumi.com/");
+      log("AbyssPlayer: resolutor externo elegido como principal; conservando fuentes restantes");
+      continue;
+    }
     try {
       primary = c.media ? { url: c.url, mime: mimeOf(c.url), headers: { Referer: "https://mytsumi.com/", "User-Agent": UA }, label: labelOf(c.url) } : await resolveEmbed(c.url, "https://mytsumi.com/");
       log("fuente resuelta", c.origin || "iframe", "embed", safeUrl(c.url), "nombre", labelOf(c.url), "media final", safeUrl(primary.url), "tipo", primary.mime || mimeOf(primary.url));
