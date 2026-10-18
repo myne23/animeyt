@@ -1224,11 +1224,11 @@ export async function resolve(ref) {
     if (c.container) continue;
     if (primary) {
       const h = hostOf(c.url);
-      // Prueba: pasar Abyss directamente como alternativa externa, sin una segunda llamada resolve(ref).
+      // Usar la ruta normal de Kino para que la selección manual vuelva a resolve()
+      // y desde ahí delegue al resolutor externo con protocol="abyss".
       if (/^player\.abyssplayer\.com$/i.test(h)) {
-        const delegated = abyssExternal(c.url, "https://mytsumi.com/");
-        lazy.push({ label: "AbyssPlayer", external: delegated.external });
-        log("AbyssPlayer: alternativa externa directa registrada");
+        lazy.push({ label: "AbyssPlayer", ref: "v|" + c.url });
+        log("AbyssPlayer: alternativa registrada mediante resolve(ref)");
         continue;
       }
       const ref = (c.media ? "d|" : "v|") + c.url;
