@@ -916,8 +916,6 @@ async function resolveBysekoze(embed, site, label, headers) {
   }
 }
 
-const ABYSS_RESOLVER = "com.mmilew.kinoresolvers";
-
 function abyssExternal(embed, referer) {
   let parsed;
   try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de Abyss inválida"); }
@@ -931,7 +929,7 @@ function abyssExternal(embed, referer) {
   // Pass the exact embed URL: Abyss may use different path prefixes, so the app must not guess /embed/ or /e/.
   const ref = "abyss:" + encodeURIComponent(parsed.href) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
   log("AbyssPlayer: delegando al resolutor externo", slug);
-  return { external: { protocol: "abyss", ref, resolver: ABYSS_RESOLVER } };
+  return { external: { protocol: "abyss", ref } };
 }
 
 function abyssLazyRef(embed, referer) {
