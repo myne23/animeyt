@@ -1,7 +1,7 @@
 {
   "id": "animeyt",
   "name": "AnimeYT",
-  "version": "0.1.55",
+  "version": "0.1.56",
   "apiVersion": 11,
   "entry": "plugin.js",
   "description": "Busca anime, donghua y películas subtitulados en AnimeYT.",
@@ -52,5 +52,20 @@
   "categories": [
     "anime"
   ],
-  "streamHosts": "any"
+  "streamHosts": "any",
+  "externalResolver": {
+    "package": "com.mmilew.kinoresolvers",
+    "apk": {
+      "url": "https://github.com/myne23/abyssresolver/releases/download/v1.0.0/kino-resolvers.apk",
+      "sha256": "3360f6350f43ba99381a900ab654c97569aa9e67972bdf48e69f4df5144504a4",
+      "label": "Kino Resolvers 1.0.0"
+    }
+  },
+  "settings": [
+    {
+      "key": "installResolver",
+      "label": "Obtener Kino Resolvers",
+      "type": "action"
+    }
+  ]
 }
