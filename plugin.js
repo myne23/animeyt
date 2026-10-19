@@ -1233,16 +1233,18 @@ export async function resolve(ref) {
       candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
-  // Prueba externa: priorizar MEGA para que Kino invoque Kino Resolvers desde la fuente principal.
-  // Si MEGA no puede reproducirse, Archive.org, Bysekoze, OK.ru y Abyss quedan como alternativas.
+  // Elegir primero una fuente reproducible dentro de Kino.
+  // MEGA y Abyss se conservan como alternativas externas; no deben ser la respuesta
+  // principal si hay otra fuente normal, porque un traspaso external como respuesta
+  // completa no garantiza conservar las alternatives adjuntas después.
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
-    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return -1;
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
     if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 30;
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return 35;
     return 50;
   };
   candidates.sort((a, b) => prio(a) - prio(b));
