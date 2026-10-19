@@ -919,7 +919,7 @@ async function resolveBysekoze(embed, site, label, headers) {
 function abyssExternal(embed, referer) {
   let parsed;
   try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de Abyss inválida"); }
-  if (parsed.protocol !== "https:" || parsed.hostname !== "player.abyssplayer.com") {
+  if (parsed.protocol !== "https:" || !/^(?:player\.)?abyssplayer\.com$/i.test(parsed.hostname)) {
     throw kino.error("not_found", "El enlace no pertenece a AbyssPlayer");
   }
   const slug = parsed.pathname.split("/").filter(Boolean).pop() || "";
@@ -1142,7 +1142,7 @@ export async function resolve(ref) {
 
   if (/^v\|/.test(ref)) {
     const url = ref.slice(2);
-    if (/^player\.abyssplayer\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
     // Como en donghuas-sub-es: si el usuario elige Filemoon manualmente,
     // permitir la captura de navegador incluso cuando el PoW HTTP agota el tiempo.
     return await resolveEmbed(url, BASE + "/", { allowBrowserOnPow: true });
@@ -1208,9 +1208,13 @@ export async function resolve(ref) {
   }
   // Prioridad global: Archive.org primero, Bysekoze segundo, OK.ru tercero;
   // AbyssPlayer y MEGA quedan como alternativas seleccionables cuando estén presentes.
+  const moviePath = /\/pelicula\//i.test(path);
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
+    // En películas, Abyss debe ser principal: Kino puede no volver a enlazar
+    // el servicio externo cuando Abyss queda detrás de una fuente directa.
+    if (moviePath && /^(?:player\.)?abyssplayer\.com$/i.test(h)) return -1;
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
@@ -1226,7 +1230,7 @@ export async function resolve(ref) {
       const h = hostOf(c.url);
       // Usar la ruta normal de Kino para que la selección manual vuelva a resolve()
       // y desde ahí delegue al resolutor externo con protocol="abyss".
-      if (/^player\.abyssplayer\.com$/i.test(h)) {
+      if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) {
         lazy.push({ label: "AbyssPlayer", ref: "v|" + c.url });
         log("AbyssPlayer: alternativa registrada mediante resolve(ref)");
         continue;
@@ -1236,7 +1240,7 @@ export async function resolve(ref) {
       continue;
     }
     if (left() < 5000) break;
-    if (/^player\.abyssplayer\.com$/i.test(hostOf(c.url))) {
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(hostOf(c.url))) {
       // Mantener Abyss como fuente inicial para que Kino invoque el resolutor externo
       // (y muestre su consentimiento), pero seguir recorriendo candidatos para adjuntar
       // Archive.org, OK.ru, Bysekoze y demás como alternativas elegibles.
