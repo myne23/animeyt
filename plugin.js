@@ -1,5 +1,5 @@
 /// <reference path="./kino.d.ts" />
-// AnimeYT para Kino (apiVersion 6). Parseo por regex sobre anclas: no depende de clases CSS.
+// AnimeYT para Kino (apiVersion 11). Parseo por regex sobre anclas: no depende de clases CSS.
 // Catálogo/episodios: HTML del sitio (WordPress, tema "aniyt").
 // Reproducción: iframe mytsumi.com/container.php -> servidores -> resolutores directos;
 // kino.browser.capture solo como último recurso.
@@ -916,10 +916,23 @@ async function resolveBysekoze(embed, site, label, headers) {
   }
 }
 
+function megaExternal(embed, referer) {
+  let parsed;
+  try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de MEGA inválida"); }
+  if (parsed.protocol !== "https:" || !/^(?:www\.)?mega\.(?:nz|io)$/i.test(parsed.hostname)) {
+    throw kino.error("not_found", "El enlace no pertenece a MEGA");
+  }
+  if (!/\/(?:embed|file)\//i.test(parsed.pathname) || !parsed.hash) {
+    throw kino.error("not_found", "El enlace MEGA no incluye la key de descifrado");
+  }
+  log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop() || "handle");
+  return { external: { protocol: "mega", ref: parsed.href } };
+}
+
 function abyssExternal(embed, referer) {
   let parsed;
   try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de Abyss inválida"); }
-  if (parsed.protocol !== "https:" || parsed.hostname !== "player.abyssplayer.com") {
+  if (parsed.protocol !== "https:" || !/^(?:player\.)?abyssplayer\.com$/i.test(parsed.hostname)) {
     throw kino.error("not_found", "El enlace no pertenece a AbyssPlayer");
   }
   const slug = parsed.pathname.split("/").filter(Boolean).pop() || "";
@@ -941,6 +954,8 @@ async function resolveEmbed(url, referer, options) {
   const host = hostOf(url);
   // Se preservan los resolutores que ya funcionan: OK.ru directo y archivos directos del contenedor.
   if (/(^|\.)ok\.ru$|odnoklassniki/i.test(host)) return resolveOk(url, referer);
+  // MEGA no expone un MP4 inspeccionable: delegar al servicio externo.
+  if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(host)) return megaExternal(url, referer);
   // Bysekoze/Filemoon: resolver HTTP específico (API, desafío y URL real) antes de la captura genérica.
   if (/bysekoze\.com|bysesukior\.com|n1mwq\.org/i.test(host)) {
     const started = T0();
@@ -965,7 +980,7 @@ async function resolveEmbed(url, referer, options) {
     return resolveWithBrowser(url, referer);
   }
   // AbyssPlayer necesita descifrar la cabecera MP4 fuera del sandbox de Kino.
-  if (/^player\\.abyssplayer\\.com$/i.test(host)) return abyssExternal(url, referer);
+  if (/^player\.abyssplayer\.com$/i.test(host)) return abyssExternal(url, referer);
   return resolveGeneric(url, referer);
 }
 
@@ -974,16 +989,50 @@ async function containerSources(cUrl, referer) {
   const found = { media: [], embeds: [] };
   const merge = (h) => { h.media.forEach((u) => !found.media.includes(u) && found.media.push(u)); h.embeds.forEach((u) => !found.embeds.includes(u) && found.embeds.push(u)); };
   const idm = /[?&]id=([^&]+)/.exec(cUrl); const cid = idm ? idm[1] : "";
-  // Conservar id, idioma y filtros del servidor tal como los usa el navegador real.
-  // Solo añadir open=1 si todavía no está presente.
-  const open = /[?&]open=1(?:&|$)/.test(cUrl) ? cUrl : cUrl + (cUrl.includes("?") ? "&" : "?") + "open=1";
-  log("container URL", "open=1", /[?&]open=1(?:&|$)/.test(open) ? "sí" : "no", "filtros", /[?&]lang=/.test(open) ? "lang presente" : "lang ausente", /[?&]only=/.test(open) ? "only presente" : "only ausente");
+  // Primero pedir el envoltorio tal cual. El HTML contiene el iframe real con open=1;
+  // usar su src exacto conserva lang/only y evita reconstruir la URL a mano.
   let html = "";
-  try { html = (await kino.fetch(open.replace("?&", "?"), { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text(); } catch (e) { log("container fetch", String(e)); }
+  let open = cUrl;
+  try {
+    const wrapper = (await kino.fetch(cUrl, { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text();
+    const iframeTags = wrapper.match(/<iframe\b[^>]*>/gi) || [];
+    let iframeSrc = "";
+    for (const tag of iframeTags) {
+      const rawSrc = attr(tag, "src") || attr(tag, "data-src");
+      if (!rawSrc) continue;
+      const candidate = absUrlFrom(rawSrc, cUrl);
+      try {
+        const parsed = new URL(candidate);
+        if (parsed.hostname.replace(/^www\./i, "").toLowerCase() === "mytsumi.com" &&
+            /\/container\.php$/i.test(parsed.pathname) && parsed.searchParams.has("id") &&
+            parsed.searchParams.get("open") === "1") {
+          iframeSrc = parsed.toString();
+          break;
+        }
+      } catch {}
+    }
+    // Si el envoltorio no contiene un iframe reconocible, conservar el método anterior:
+    // abrir container.php con open=1, manteniendo id/lang/only originales.
+    if (iframeSrc) open = iframeSrc;
+    else if (/[?&]open=1(?:&|$)/.test(cUrl)) open = cUrl;
+    else open = cUrl + (cUrl.includes("?") ? "&" : "?") + "open=1";
+    if (iframeSrc) log("container iframe real", safeUrl(cUrl), "=>", safeUrl(open));
+    else if (open !== cUrl) log("container fallback", "open=1 añadido conservando filtros", safeUrl(open));
+    if (open !== cUrl || /[?&]open=1(?:&|$)/.test(open)) {
+      html = (await kino.fetch(open, { headers: { "User-Agent": UA, Referer: referer }, timeoutMs: 9000 })).text();
+    } else html = wrapper;
+  } catch (e) { log("container fetch", String((e && e.message) || e)); }
+  log("container filtros", "lang", /[?&]lang=/.test(open) ? "presente" : "ausente", "only", /[?&]only=/.test(open) ? "presente" : "ausente");
   const htmlFound = harvest(html);
   merge(htmlFound);
   const playerFound = harvestMytsumiPlayers(html, open);
   merge(playerFound);
+  const megaQualities = {};
+  for (const u of playerFound.embeds) {
+    const quality = mytsumiMegaQuality(html, u);
+    if (quality) megaQualities[u] = quality;
+  }
+  found.qualities = megaQualities;
   if (playerFound.media.length || playerFound.embeds.length) {
     log("container botones MyTsumi", "media", describeUrls(playerFound.media), "embeds", describeUrls(playerFound.embeds));
   }
@@ -1047,6 +1096,37 @@ function absUrlFrom(u, base) { try { return new URL(unesc(u), base).toString(); 
 
 // MyTsumi publica los servidores del reproductor como botones con data-player-url.
 // Extraerlos explícitamente evita depender de que la URL aparezca en un script o texto suelto.
+function megaHandle(url) {
+  try {
+    const u = new URL(url);
+    if (!/^(?:www\.)?mega\.(?:nz|io)$/i.test(u.hostname)) return "";
+    return (u.pathname.match(/\/(?:embed|file)\/([^/]+)/i) || [])[1] || "";
+  } catch { return ""; }
+}
+function mytsumiMegaQuality(html, url) {
+  const handle = megaHandle(url);
+  if (!handle) return "";
+  const source = unesc(String(html || ""));
+  const tags = source.match(/<(?:button|a)\b[^>]*>/gi) || [];
+  for (const tag of tags) {
+    const candidate = attr(tag, "data-player-url") || attr(tag, "href");
+    if (!candidate || megaHandle(absUrlFrom(candidate, "https://mytsumi.com/")) !== handle) continue;
+    const match = /([0-9]{3,4})\s*p/i.exec(attr(tag, "title") || "");
+    if (match) return match[1] + "p";
+  }
+  const tabsMatch = /(?:const|let|var)\s+videoTabs\s*=\s*(\[[\s\S]*?\])\s*;/i.exec(source);
+  if (tabsMatch) {
+    try {
+      for (const tab of JSON.parse(tabsMatch[1])) {
+        if (!tab || !tab.url || megaHandle(absUrlFrom(tab.url, "https://mytsumi.com/")) !== handle) continue;
+        const match = /([0-9]{3,4})\s*p/i.exec(String(tab.title || tab.tab_name || tab.label || ""));
+        if (match) return match[1] + "p";
+      }
+    } catch {}
+  }
+  return "";
+}
+
 function harvestMytsumiPlayers(html, base) {
   const out = { media: [], embeds: [] };
   const source = unesc(String(html || ""));
@@ -1058,6 +1138,14 @@ function harvestMytsumiPlayers(html, base) {
   }
   const tags = source.match(/<(?:button|a)\b[^>]*>/gi) || [];
   for (const tag of tags) { const raw = attr(tag, "data-player-url"); if (!raw) continue; const url = absUrlFrom(raw, base); if (!/^https?:\/\//i.test(url)) continue; const kind = attr(tag, "data-player-kind").toLowerCase(); if (kind === "video" || /\.(?:mp4|m3u8|mpd|webm)(?:$|[?#])/i.test(url)) { if (!out.media.includes(url)) out.media.push(url); } else if (!out.embeds.includes(url)) out.embeds.push(url); }
+  // MyTsumi downloads panel: anchors contain mega.nz/file/HANDLE#KEY.
+  for (const tag of tags) {
+    if (!/mytsumi-download-button/i.test(attr(tag, "class"))) continue;
+    const raw = attr(tag, "href");
+    if (!raw || !/mega\.(?:nz|io)\/(?:file|embed)\//i.test(raw)) continue;
+    const url = absUrlFrom(raw, base);
+    if (url && !out.embeds.includes(url)) out.embeds.push(url);
+  }
   return out;
 }
 function pageEmbeds(html) {
@@ -1075,6 +1163,11 @@ function pageEmbeds(html) {
     let x;
     try { x = new URL(u); } catch (e) { return; }
     const h = x.hostname.replace(/^www\./i, "").toLowerCase();
+    // MEGA tab/download links must be preserved with their #KEY fragment.
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h) && /\/(?:embed|file)\//i.test(x.pathname)) {
+      if (!out.includes(u)) out.push(u);
+      return;
+    }
     // MyTsumi puede aparecer como iframe real o como enlace <a> con el texto "iframe".
     if (h === "mytsumi.com" &&
         ((x.pathname === "/container.php" && x.searchParams.has("id")) ||
@@ -1142,7 +1235,8 @@ export async function resolve(ref) {
 
   if (/^v\|/.test(ref)) {
     const url = ref.slice(2);
-    if (/^player\.abyssplayer\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(hostOf(url))) return megaExternal(url, "https://mytsumi.com/");
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
     // Como en donghuas-sub-es: si el usuario elige Filemoon manualmente,
     // permitir la captura de navegador incluso cuando el PoW HTTP agota el tiempo.
     return await resolveEmbed(url, BASE + "/", { allowBrowserOnPow: true });
@@ -1202,7 +1296,15 @@ export async function resolve(ref) {
       const src = await containerSources(sourceUrl, absUrlFrom(path, BASE + "/"));
       src.media.forEach((u) => candidates.push({ url: u, media: true, origin: "media-del-contenedor", lang }));
       // Conservar MEGA como alternativa visible para probar la futura integración del resolutor.
-      src.embeds.forEach((u) => candidates.push({ url: u, origin: "embed-del-contenedor", lang }));
+      const seenMegaHandles = new Set();
+      src.embeds.forEach((u) => {
+        const handle = megaHandle(u);
+        if (handle) {
+          if (seenMegaHandles.has(handle)) return;
+          seenMegaHandles.add(handle);
+        }
+        candidates.push({ url: u, origin: "embed-del-contenedor", lang, quality: (src.qualities && src.qualities[u]) || "" });
+      });
       candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
@@ -1226,17 +1328,17 @@ export async function resolve(ref) {
       const h = hostOf(c.url);
       // Usar la ruta normal de Kino para que la selección manual vuelva a resolve()
       // y desde ahí delegue al resolutor externo con protocol="abyss".
-      if (/^player\.abyssplayer\.com$/i.test(h)) {
+      if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) {
         lazy.push({ label: "AbyssPlayer", ref: "v|" + c.url });
         log("AbyssPlayer: alternativa registrada mediante resolve(ref)");
         continue;
       }
       const ref = (c.media ? "d|" : "v|") + c.url;
-      lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : /mega\.nz|mega\.io/i.test(h) ? "MEGA" : labelOf(c.url)), ref });
+      lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : /mega\.nz|mega\.io/i.test(h) ? ("MEGA" + (c.quality ? " · " + c.quality : "")) : labelOf(c.url)), ref });
       continue;
     }
     if (left() < 5000) break;
-    if (/^player\.abyssplayer\.com$/i.test(hostOf(c.url))) {
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(hostOf(c.url))) {
       // Mantener Abyss como fuente inicial para que Kino invoque el resolutor externo
       // (y muestre su consentimiento), pero seguir recorriendo candidatos para adjuntar
       // Archive.org, OK.ru, Bysekoze y demás como alternativas elegibles.

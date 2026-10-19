@@ -41,7 +41,7 @@ const kino = {
   fetch: async (u) => {
     if (u.startsWith("https://animeyt.cc/wp-json/aniyt/v1/home/episodes?")) {
       latestEndpointCalls++;
-      const html = \`<article data-episode-id="118226"><a href="/118226/anime/tensei-temporada-2-capitulo-2/"><img src="data:image/svg+xml;base64,AA==" data-src="https://i0.wp.com/a2.jpg"> T2 EP 2</a><h3><a href="/118226/anime/tensei-temporada-2-capitulo-2/">Tensei</a></h3></article><article data-episode-id="118227"><a href="/118227/anime/tensei-temporada-2-capitulo-1/"><img data-src="https://i0.wp.com/a1.jpg"> T2 EP 1</a><h3><a href="/118227/anime/tensei-temporada-2-capitulo-1/">Tensei</a></h3></article>\`;
+      const html = `<article data-episode-id="118226"><a href="/118226/anime/tensei-temporada-2-capitulo-2/"><img src="data:image/svg+xml;base64,AA==" data-src="https://i0.wp.com/a2.jpg"> T2 EP 2</a><h3><a href="/118226/anime/tensei-temporada-2-capitulo-2/">Tensei</a></h3></article><article data-episode-id="118227"><a href="/118227/anime/tensei-temporada-2-capitulo-1/"><img data-src="https://i0.wp.com/a1.jpg"> T2 EP 1</a><h3><a href="/118227/anime/tensei-temporada-2-capitulo-1/">Tensei</a></h3></article>`;
       return { ok:true, status:200, url:u, text:()=>JSON.stringify({html,ids:["118226","118227"],has_more:false}) };
     }
     const t = pages[u] ?? pages[u.replace(/\?.*/, "")];
@@ -106,13 +106,18 @@ eq(longLast.episodes[19].number, 170, "último bloque termina en episodio 170");
 const st = await p.resolve("e|/118225/anime/tensei-temporada-2-capitulo-3/");
 eq(st.url, "https://vd1.okcdn.ru/x.m3u8", "resolve ok.ru HLS");
 console.log("stream:", st.label, st.mime, "alts:", (st.alternatives||[]).length);
-for (const host of ["https://bysesukior.com/e/test", "https://mega.nz/embed/test"]) {
-  const captured = await p.resolve("v|" + host);
-  eq(captured.url, "https://cdn.example.test/captured.m3u8", "browser capture for " + new URL(host).hostname);
-  eq(captured.mime, "application/x-mpegURL", "browser capture MIME for " + new URL(host).hostname);
-}
+const captured = await p.resolve("v|https://bysesukior.com/e/test");
+eq(captured.url, "https://cdn.example.test/captured.m3u8", "browser capture for bysesukior.com");
+eq(captured.mime, "application/x-mpegURL", "browser capture MIME for bysesukior.com");
+const mega = await p.resolve("v|https://mega.nz/embed/ayxnkbRA#27Ymo-aIa5oxVtSIB8qotfVpYdu2GBv-zJpQ-7KjXWQ");
+eq(mega.external.protocol, "mega", "MEGA uses external resolver protocol");
+eq(mega.external.resolver, undefined, "MEGA keeps the existing protocol-only resolver contract");
+eq(mega.external.ref, "https://mega.nz/embed/ayxnkbRA#27Ymo-aIa5oxVtSIB8qotfVpYdu2GBv-zJpQ-7KjXWQ", "MEGA preserves handle and decryption key");
 const abyss = await p.resolve("v|https://player.abyssplayer.com/m27Fa0uPI");
 eq(abyss.external.protocol, "abyss", "Abyss uses external resolver protocol");
-eq(abyss.external.resolver, "com.myne23.abyssresolver", "Abyss names the companion app");
+eq(abyss.external.resolver, undefined, "Abyss keeps the existing protocol-only resolver contract");
 eq(abyss.external.ref, "abyss:https%3A%2F%2Fplayer.abyssplayer.com%2Fm27Fa0uPI:best:https%3A%2F%2Fmytsumi.com%2F", "Abyss ref preserves the exact embed URL, quality and referer");
+const abyssMovie = await p.resolve("v|https://abyssplayer.com/7XMhdjzJz");
+eq(abyssMovie.external.protocol, "abyss", "Abyss movie apex hostname uses external resolver");
+eq(abyssMovie.external.ref, "abyss:https%3A%2F%2Fabyssplayer.com%2F7XMhdjzJz:best:https%3A%2F%2Fmytsumi.com%2F", "Abyss movie ref preserves apex hostname and slug");
 console.log("TODO OK");
