@@ -1241,8 +1241,11 @@ export async function resolve(ref) {
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
-    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 30;
-    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return 35;
+    // Las fuentes externas nunca deben desplazar una fuente reproducible normal.
+    // Se prueban después de Archive.org, Bysekoze, OK.ru y otros embeds; si hay
+    // una fuente normal disponible, Abyss/MEGA quedan como alternativas seleccionables.
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 80;
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return 85;
     return 50;
   };
   candidates.sort((a, b) => prio(a) - prio(b));
