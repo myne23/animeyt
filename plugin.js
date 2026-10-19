@@ -926,12 +926,12 @@ function abyssExternal(embed, referer) {
   if (!/^[A-Za-z0-9_-]{4,120}$/.test(slug)) {
     throw kino.error("not_found", "No se encontró el identificador del reproductor Abyss");
   }
-  // Referencia nativa de Abyss: el servicio reconstruye la URL del reproductor
-  // desde el slug. No fijamos el paquete aquí: dejamos que Kino descubra el servicio
-  // que declara el protocolo original "abyss". MEGA conserva su ruta actual intacta.
+  // Referencia nativa de Abyss. Fijamos el mismo paquete del resolutor que ya funciona
+  // con MEGA para que Kino no tenga que adivinar qué servicio debe recibir el protocolo.
+  // El protocolo sigue siendo "abyss" y el formato de referencia no cambia.
   const ref = "abyss:" + encodeURIComponent(slug) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
-  log("AbyssPlayer: delegando al resolutor externo", slug);
-  return { external: { protocol: "abyss", ref } };
+  log("AbyssPlayer: delegando al resolutor externo", slug, "package=com.mmilew.kinoresolvers");
+  return { external: { protocol: "abyss", ref, resolver: "com.mmilew.kinoresolvers" } };
 }
 
 function megaExternal(embed) {
