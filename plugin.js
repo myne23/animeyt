@@ -926,12 +926,12 @@ function abyssExternal(embed, referer) {
   if (!/^[A-Za-z0-9_-]{4,120}$/.test(slug)) {
     throw kino.error("not_found", "No se encontró el identificador del reproductor Abyss");
   }
-  // El APK acepta el slug como primer campo y reconstruye https://player.abyssplayer.com/<slug>.
-  // Evitar meter la URL completa codificada en ese campo: así usamos el formato simple que
-  // el protocolo Abyss espera, sin cambiar el formato de MEGA ni su ruta ya probada.
-  const ref = "abyss:" + encodeURIComponent(slug) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
+  // Mantener el protocolo original "abyss" y entregar la URL del embed explícita,
+  // siguiendo el mismo patrón de delegación externa que MEGA. El APK acepta la URL
+  // codificada en el primer campo de su referencia abyss:<url>:<calidad>:<referer>.
+  const ref = "abyss:" + encodeURIComponent(parsed.href) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
   log("AbyssPlayer: delegando al resolutor externo", slug);
-  return { external: { protocol: "abyss3", ref, resolver: "com.mmilew.kinoresolvers" } };
+  return { external: { protocol: "abyss", ref, resolver: "com.mmilew.kinoresolvers" } };
 }
 
 function megaExternal(embed) {
