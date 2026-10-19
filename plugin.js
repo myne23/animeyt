@@ -931,7 +931,7 @@ function abyssExternal(embed, referer) {
   // el protocolo Abyss espera, sin cambiar el formato de MEGA ni su ruta ya probada.
   const ref = "abyss:" + encodeURIComponent(slug) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
   log("AbyssPlayer: delegando al resolutor externo", slug);
-  return { external: { protocol: "abyss2", ref, resolver: "com.mmilew.kinoresolvers" } };
+  return { external: { protocol: "abyss", ref, resolver: "com.mmilew.kinoresolvers" } };
 }
 
 function megaExternal(embed) {
