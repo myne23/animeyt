@@ -932,6 +932,21 @@ function abyssExternal(embed, referer) {
   return { external: { protocol: "abyss", ref } };
 }
 
+function megaExternal(embed) {
+  let parsed;
+  try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de MEGA inválida"); }
+  if (parsed.protocol !== "https:" || !/^(?:www\.)?mega\.(?:nz|io)$/i.test(parsed.hostname)) {
+    throw kino.error("not_found", "El enlace no pertenece a MEGA");
+  }
+  if (!/^\/(?:embed|file)\/[A-Za-z0-9_-]{6,32}\/?$/.test(parsed.pathname)) {
+    throw kino.error("not_found", "No se encontró el identificador del archivo MEGA");
+  }
+  // No reconstruir la URL: el fragmento #clave es necesario para descifrar el archivo.
+  const keyPresent = Boolean(parsed.hash && parsed.hash.length > 1);
+  log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop(), "key=" + (keyPresent ? "presente" : "ausente"));
+  return { external: { protocol: "mega", ref: parsed.href } };
+}
+
 function abyssLazyRef(embed, referer) {
   return "a|" + encodeURIComponent(embed) + "|" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
 }
@@ -964,6 +979,8 @@ async function resolveEmbed(url, referer, options) {
     catch (e) { log("Bysekoze HTML sin media; se probará navegador", String((e && e.message) || e)); }
     return resolveWithBrowser(url, referer);
   }
+  // Ambos proveedores requieren el servicio externo; no pasar sus embeds por el parser HTML genérico.
+  if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(host)) return megaExternal(url);
   // AbyssPlayer necesita descifrar la cabecera MP4 fuera del sandbox de Kino.
   if (/^player\.abyssplayer\.com$/i.test(host)) return abyssExternal(url, referer);
   return resolveGeneric(url, referer);
@@ -1027,6 +1044,8 @@ async function containerSources(cUrl, referer) {
     });
   }
   log("container total", "media", found.media.length, describeUrls(found.media), "embeds", found.embeds.length, describeUrls(found.embeds));
+  const megaLinks = found.embeds.filter((u) => /^(?:https:\/\/)?(?:www\.)?mega\.(?:nz|io)\//i.test(u));
+  if (megaLinks.length) log("MEGA enlaces del contenedor", megaLinks.map((u) => { try { const x = new URL(u); return x.origin + x.pathname + " key=" + (x.hash.length > 1 ? "presente" : "ausente"); } catch { return "URL MEGA inválida"; } }).join(" | "));
   return found;
 }
 function decodeBase64Url(value) {
@@ -1143,13 +1162,21 @@ export async function resolve(ref) {
   if (/^v\|/.test(ref)) {
     const url = ref.slice(2);
     if (/^(?:player\.)?abyssplayer\.com$/i.test(hostOf(url))) return abyssExternal(url, "https://mytsumi.com/");
+    // MEGA también debe delegarse al APK externo cuando se elige como alternativa,
+    // no solo cuando queda como fuente principal.
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(hostOf(url))) return megaExternal(url);
     // Como en donghuas-sub-es: si el usuario elige Filemoon manualmente,
     // permitir la captura de navegador incluso cuando el PoW HTTP agota el tiempo.
     return await resolveEmbed(url, BASE + "/", { allowBrowserOnPow: true });
   }
 
   const path = ref.replace(/^[a-z]\|/, "");
-  let html = await get(path);
+  // Kino puede entregar la ruta del episodio sin prefijo y/o como ruta relativa.
+  // Convertirla a URL absoluta antes de cualquier fetch evita invalid_request.
+  const pageUrl = /^https?:\/\//i.test(path)
+    ? path
+    : BASE + (path.startsWith("/") ? path : "/" + path);
+  let html = await get(pageUrl);
   let embeds = pageEmbeds(html);
   if (!embeds.length) {
     // Las fichas de películas enlazan a una ruta independiente /<id>/anime/<slug>/.
@@ -1206,15 +1233,17 @@ export async function resolve(ref) {
       candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
-  // Prioridad global: Archive.org primero, Bysekoze segundo, OK.ru tercero;
-  // AbyssPlayer y MEGA quedan como alternativas seleccionables cuando estén presentes.
+  // Prioridad global: Archive.org primero, Bysekoze segundo y OK.ru tercero.
+  // AbyssPlayer y MEGA siguen disponibles, pero quedan detrás de las fuentes integradas.
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
     if (/(^|\.)archive\.org$/.test(h)) return 0;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
-    return 30;
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 30;
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return 40;
+    return 50;
   };
   candidates.sort((a, b) => prio(a) - prio(b));
   log("candidatos de fuente", candidates.map((c, i) => (i + 1) + ":" + (c.origin || "iframe") + ":" + (c.media ? "media" : c.container ? "container" : "embed") + ":" + safeUrl(c.url) + (c.lang ? ":lang=" + c.lang : "")).join(" || ") || "(ninguno)");
@@ -1242,6 +1271,14 @@ export async function resolve(ref) {
       // Archive.org, OK.ru, Bysekoze y demás como alternativas elegibles.
       primary = abyssExternal(c.url, "https://mytsumi.com/");
       log("AbyssPlayer: resolutor externo elegido como principal; conservando fuentes restantes");
+      continue;
+    }
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(hostOf(c.url))) {
+      // Kino no estaba abriendo el resolutor externo desde una alternativa perezosa.
+      // En la rama de prueba, MEGA se entrega como fuente principal; los demás servidores
+      // siguen disponibles como alternativas de respaldo.
+      primary = megaExternal(c.url);
+      log("MEGA: resolutor externo elegido como principal; conservando fuentes restantes");
       continue;
     }
     try {
