@@ -916,7 +916,7 @@ async function resolveBysekoze(embed, site, label, headers) {
   }
 }
 
-function abyssExternal(embed, referer) {
+function abyssExternal(embed, referer, quiet) {
   let parsed;
   try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de Abyss inválida"); }
   if (parsed.protocol !== "https:" || !/^(?:player\.)?abyssplayer\.com$/i.test(parsed.hostname)) {
@@ -926,15 +926,12 @@ function abyssExternal(embed, referer) {
   if (!/^[A-Za-z0-9_-]{4,120}$/.test(slug)) {
     throw kino.error("not_found", "No se encontró el identificador del reproductor Abyss");
   }
-  // Referencia nativa de Abyss. Fijamos el mismo paquete del resolutor que ya funciona
-  // con MEGA para que Kino no tenga que adivinar qué servicio debe recibir el protocolo.
-  // El protocolo sigue siendo "abyss" y el formato de referencia no cambia.
-  const ref = "abyss:" + encodeURIComponent(slug) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
-  log("AbyssPlayer: delegando al resolutor externo", slug, "package=com.mmilew.kinoresolvers");
+  const ref = "abyss:" + encodeURIComponent(slug) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/");
+  if (!quiet) log("AbyssPlayer: delegando al resolutor externo", slug, "package=com.mmilew.kinoresolvers");
   return { external: { protocol: "abyss", ref, resolver: "com.mmilew.kinoresolvers" } };
 }
 
-function megaExternal(embed) {
+function megaExternal(embed, quiet) {
   let parsed;
   try { parsed = new URL(embed); } catch { throw kino.error("not_found", "Referencia de MEGA inválida"); }
   if (parsed.protocol !== "https:" || !/^(?:www\.)?mega\.(?:nz|io)$/i.test(parsed.hostname)) {
@@ -943,9 +940,8 @@ function megaExternal(embed) {
   if (!/^\/(?:embed|file)\/[A-Za-z0-9_-]{6,32}\/?$/.test(parsed.pathname)) {
     throw kino.error("not_found", "No se encontró el identificador del archivo MEGA");
   }
-  // No reconstruir la URL: el fragmento #clave es necesario para descifrar el archivo.
   const keyPresent = Boolean(parsed.hash && parsed.hash.length > 1);
-  log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop(), "key=" + (keyPresent ? "presente" : "ausente"));
+  if (!quiet) log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop(), "key=" + (keyPresent ? "presente" : "ausente"));
   return { external: { protocol: "mega", ref: parsed.href, resolver: "com.mmilew.kinoresolvers" } };
 }
 
@@ -1257,20 +1253,18 @@ export async function resolve(ref) {
     if (c.container) continue;
     if (primary) {
       const h = hostOf(c.url);
-      // Usar la ruta normal de Kino para que la selección manual vuelva a resolve()
-      // y desde ahí delegue al resolutor externo con protocol="abyss".
+      // Entregar la alternativa externa ya declarada, sin depender de una segunda
+      // llamada a resolve("v|...") al seleccionarla en Kino.
       if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) {
-        // Alternativa perezosa: al elegirla, Kino llama resolve("v|...") y
-        // el camino normal del plugin devuelve el traspaso external al APK.
-        lazy.push({ label: "AbyssPlayer", ref: "v|" + c.url });
-        log("AbyssPlayer: alternativa externa perezosa preparada");
+        const external = abyssExternal(c.url, "https://mytsumi.com/", true);
+        lazy.push({ external: external.external, label: "AbyssPlayer" });
+        log("AbyssPlayer: alternativa externa directa preparada");
         continue;
       }
       if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) {
-        // La resolución externa ocurre dentro de resolve("v|...") cuando se elige
-        // esta alternativa, igual que cuando MEGA es la fuente principal.
-        lazy.push({ label: "MEGA", ref: "v|" + c.url });
-        log("MEGA: alternativa externa perezosa preparada", "key=" + (new URL(c.url).hash.length > 1 ? "presente" : "ausente"));
+        const external = megaExternal(c.url, true);
+        lazy.push({ external: external.external, label: "MEGA" });
+        log("MEGA: alternativa externa directa preparada", "key=" + (new URL(c.url).hash.length > 1 ? "presente" : "ausente"));
         continue;
       }
       const ref = (c.media ? "d|" : "v|") + c.url;
