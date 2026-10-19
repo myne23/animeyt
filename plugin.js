@@ -1238,11 +1238,11 @@ export async function resolve(ref) {
   const prio = (c) => {
     const h = hostOf(c.url);
     if (c.container) return 99;
-    if (/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(h)) return -1;
-    if (/(^|\\.)archive\\.org$/.test(h)) return 0;
-    if (/bysekoze\\.com$|bysesukior\\.com$|n1mwq\\.org$/.test(h)) return 10;
-    if (/(^|\\.)ok\\.ru$|odnoklassniki/i.test(h)) return 20;
-    if (/^(?:player\\.)?abyssplayer\\.com$/i.test(h)) return 30;
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return -1;
+    if (/(^|\.)archive\.org$/.test(h)) return 0;
+    if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
+    if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 30;
     return 50;
   };
   candidates.sort((a, b) => prio(a) - prio(b));
