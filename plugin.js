@@ -1136,6 +1136,9 @@ export async function resolve(ref) {
   const started = T0();
   const left = () => 24000 - (T0() - started);
   ref = String(ref);
+  // Diagnóstico mínimo: no registrar URLs, tokens ni claves de MEGA.
+  const refType = /^d\\|/.test(ref) ? "d" : /^a\\|/.test(ref) ? "a" : /^v\\|/.test(ref) ? "v" : "page";
+  log("resolve entrada", "tipo=" + refType);
 
   // Alternativas de media directa: no hacer fetch del MP4 como HTML (Archive.org puede superar 5 MB).
   if (/^d\|/.test(ref)) {
