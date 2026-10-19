@@ -1256,8 +1256,14 @@ export async function resolve(ref) {
       // Usar la ruta normal de Kino para que la selección manual vuelva a resolve()
       // y desde ahí delegue al resolutor externo con protocol="abyss".
       if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) {
-        lazy.push({ label: "AbyssPlayer", ref: "v|" + c.url });
-        log("AbyssPlayer: alternativa registrada mediante resolve(ref)");
+        const ref = "abyss:" + encodeURIComponent(c.url) + ":best:" + encodeURIComponent("https://mytsumi.com/");
+        lazy.push({ label: "AbyssPlayer", external: { protocol: "abyss", ref, resolver: "com.mmilew.kinoresolvers" } });
+        log("AbyssPlayer: alternativa externa preparada directamente");
+        continue;
+      }
+      if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) {
+        lazy.push({ label: "MEGA", external: { protocol: "mega", ref: c.url, resolver: "com.mmilew.kinoresolvers" } });
+        log("MEGA: alternativa externa preparada directamente", "key=" + (new URL(c.url).hash.length > 1 ? "presente" : "ausente"));
         continue;
       }
       const ref = (c.media ? "d|" : "v|") + c.url;
