@@ -1313,3 +1313,14 @@ export async function resolve(ref) {
   return primary;
 }
 
+
+
+// Acción manual para facilitar la instalación del resolutor externo desde Gestionar.
+export async function action(key) {
+  if (key === "installResolver") {
+    return {
+      message: "Kino Resolvers 1.0.0 (APK): https://github.com/myne23/abyssresolver/releases/download/v1.0.0/kino-resolvers.apk"
+    };
+  }
+  throw new Error("Acción desconocida: " + String(key));
+}
