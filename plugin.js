@@ -929,7 +929,7 @@ function abyssExternal(embed, referer) {
   // Pass the exact embed URL: Abyss may use different path prefixes, so the app must not guess /embed/ or /e/.
   const ref = "abyss:" + encodeURIComponent(parsed.href) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
   log("AbyssPlayer: delegando al resolutor externo", slug);
-  return { external: { protocol: "abyss", ref } };
+  return { external: { protocol: "abyss", ref, resolver: "com.mmilew.kinoresolvers" } };
 }
 
 function megaExternal(embed) {
@@ -944,7 +944,7 @@ function megaExternal(embed) {
   // No reconstruir la URL: el fragmento #clave es necesario para descifrar el archivo.
   const keyPresent = Boolean(parsed.hash && parsed.hash.length > 1);
   log("MEGA: delegando al resolutor externo", parsed.pathname.split("/").filter(Boolean).pop(), "key=" + (keyPresent ? "presente" : "ausente"));
-  return { external: { protocol: "mega", ref: parsed.href } };
+  return { external: { protocol: "mega", ref: parsed.href, resolver: "com.mmilew.kinoresolvers" } };
 }
 
 function abyssLazyRef(embed, referer) {
