@@ -926,7 +926,7 @@ function abyssExternal(embed, referer, quiet) {
   if (!/^[A-Za-z0-9_-]{4,120}$/.test(slug)) {
     throw kino.error("not_found", "No se encontró el identificador del reproductor Abyss");
   }
-  const ref = "abyss:" + encodeURIComponent(slug) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/");
+  const ref = "abyss:" + encodeURIComponent(slug) + ":best:" + encodeURIComponent(String(referer || "https://mytsumi.com/"));
   if (!quiet) log("AbyssPlayer: delegando al resolutor externo", slug, "package=com.mmilew.kinoresolvers");
   return { external: { protocol: "abyss", ref, resolver: "com.mmilew.kinoresolvers" } };
 }
