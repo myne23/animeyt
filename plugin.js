@@ -1234,10 +1234,6 @@ export async function resolve(ref) {
       candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
-  // Elegir primero una fuente reproducible dentro de Kino.
-  // MEGA y Abyss se conservan como alternativas externas; no deben ser la respuesta
-  // principal si hay otra fuente normal, porque un traspaso external como respuesta
-  // completa no garantiza conservar las alternatives adjuntas después.
   // MEGA se prioriza en esta build de prueba para comprobar el resolver externo.
   // Abyss, Archive.org, Bysekoze, OK.ru y los demás embeds siguen como alternativas.
   const prio = (c) => {
