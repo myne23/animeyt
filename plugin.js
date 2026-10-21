@@ -1237,12 +1237,13 @@ export async function resolve(ref) {
   // AbyssPlayer y MEGA siguen disponibles, pero quedan detrás de las fuentes integradas.
   const prio = (c) => {
     const h = hostOf(c.url);
+    // MEGA primero para probar el resolutor externo; Abyss queda como alternativa.
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return -10;
     if (c.container) return 99;
     if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 0;
     if (/(^|\.)archive\.org$/.test(h)) return 10;
     if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 20;
     if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 30;
-    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return 40;
     return 50;
   };
   candidates.sort((a, b) => prio(a) - prio(b));
