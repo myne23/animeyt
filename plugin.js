@@ -1238,17 +1238,16 @@ export async function resolve(ref) {
   // MEGA y Abyss se conservan como alternativas externas; no deben ser la respuesta
   // principal si hay otra fuente normal, porque un traspaso external como respuesta
   // completa no garantiza conservar las alternatives adjuntas después.
+  // MEGA se prioriza en esta build de prueba para comprobar el resolver externo.
+  // Abyss, Archive.org, Bysekoze, OK.ru y los demás embeds siguen como alternativas.
   const prio = (c) => {
     const h = hostOf(c.url);
+    if (/^(?:www\\.)?mega\\.(?:nz|io)$/i.test(h)) return -10;
     if (c.container) return 99;
-    if (/(^|\.)archive\.org$/.test(h)) return 0;
-    if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 10;
-    if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
-    // Las fuentes externas nunca deben desplazar una fuente reproducible normal.
-    // Se prueban después de Archive.org, Bysekoze, OK.ru y otros embeds; si hay
-    // una fuente normal disponible, Abyss/MEGA quedan como alternativas seleccionables.
-    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 80;
-    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return 85;
+    if (/(^|\\.)archive\\.org$/.test(h)) return 0;
+    if (/bysekoze\\.com$|bysesukior\\.com$|n1mwq\\.org$/.test(h)) return 10;
+    if (/(^|\\.)ok\\.ru$|odnoklassniki/i.test(h)) return 20;
+    if (/^(?:player\\.)?abyssplayer\\.com$/i.test(h)) return 80;
     return 50;
   };
   candidates.sort((a, b) => prio(a) - prio(b));
