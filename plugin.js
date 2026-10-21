@@ -1233,18 +1233,17 @@ export async function resolve(ref) {
       candidates.push({ url: sourceUrl, container: true, origin: "contenedor", lang });
     } else candidates.push({ url: e });
   }
-  // Prioridad global: Archive.org primero, Bysekoze segundo y OK.ru tercero.
-  // AbyssPlayer y MEGA siguen disponibles, pero quedan detrás de las fuentes integradas.
+  // Prioridad solicitada: Archive.org → OK.ru → Bysekoze → AbyssPlayer → MEGA.
+  // AbyssPlayer y MEGA quedan siempre como alternativas manuales; nunca como principal.
   const prio = (c) => {
     const h = hostOf(c.url);
-    // MEGA primero para probar el resolutor externo; Abyss queda como alternativa.
-    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return -10;
     if (c.container) return 99;
-    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 0;
     if (/(^|\.)archive\.org$/.test(h)) return 10;
-    if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 20;
-    if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 30;
-    return 50;
+    if (/(^|\.)ok\.ru$|odnoklassniki/i.test(h)) return 20;
+    if (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h)) return 30;
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) return 40;
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) return 50;
+    return 60;
   };
   candidates.sort((a, b) => prio(a) - prio(b));
   log("candidatos de fuente", candidates.map((c, i) => (i + 1) + ":" + (c.origin || "iframe") + ":" + (c.media ? "media" : c.container ? "container" : "embed") + ":" + safeUrl(c.url) + (c.lang ? ":lang=" + c.lang : "")).join(" || ") || "(ninguno)");
@@ -1252,36 +1251,25 @@ export async function resolve(ref) {
   let primary = null; const lazy = [];
   for (const c of candidates) {
     if (c.container) continue;
+    const h = hostOf(c.url);
+    // Estos dos resolutores se ofrecen únicamente para selección manual.
+    // Así Kino no intenta abrirlos como fuente principal, incluso si las anteriores fallan.
+    if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) {
+      lazy.push({ label: "AbyssPlayer", ref: "v|" + c.url });
+      log("AbyssPlayer: alternativa manual registrada");
+      continue;
+    }
+    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(h)) {
+      lazy.push({ label: "MEGA", ref: "v|" + c.url });
+      log("MEGA: alternativa manual registrada");
+      continue;
+    }
     if (primary) {
-      const h = hostOf(c.url);
-      // Usar la ruta normal de Kino para que la selección manual vuelva a resolve()
-      // y desde ahí delegue al resolutor externo con protocol="abyss".
-      if (/^(?:player\.)?abyssplayer\.com$/i.test(h)) {
-        lazy.push({ label: "AbyssPlayer", ref: "v|" + c.url });
-        log("AbyssPlayer: alternativa registrada mediante resolve(ref)");
-        continue;
-      }
       const ref = (c.media ? "d|" : "v|") + c.url;
-      lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : /mega\.nz|mega\.io/i.test(h) ? "MEGA" : labelOf(c.url)), ref });
+      lazy.push({ label: c.media ? (/archive\.org/i.test(h) ? "Archive.org" : labelOf(c.url)) : (/bysekoze\.com$|bysesukior\.com$|n1mwq\.org$/.test(h) ? "Bysekoze" : labelOf(c.url)), ref });
       continue;
     }
     if (left() < 5000) break;
-    if (/^(?:player\.)?abyssplayer\.com$/i.test(hostOf(c.url))) {
-      // Mantener Abyss como fuente inicial para que Kino invoque el resolutor externo
-      // (y muestre su consentimiento), pero seguir recorriendo candidatos para adjuntar
-      // Archive.org, OK.ru, Bysekoze y demás como alternativas elegibles.
-      primary = abyssExternal(c.url, "https://mytsumi.com/");
-      log("AbyssPlayer: resolutor externo elegido como principal; conservando fuentes restantes");
-      continue;
-    }
-    if (/^(?:www\.)?mega\.(?:nz|io)$/i.test(hostOf(c.url))) {
-      // Kino no estaba abriendo el resolutor externo desde una alternativa perezosa.
-      // En la rama de prueba, MEGA se entrega como fuente principal; los demás servidores
-      // siguen disponibles como alternativas de respaldo.
-      primary = megaExternal(c.url);
-      log("MEGA: resolutor externo elegido como principal; conservando fuentes restantes");
-      continue;
-    }
     try {
       primary = c.media ? { url: c.url, mime: mimeOf(c.url), headers: { Referer: "https://mytsumi.com/", "User-Agent": UA }, label: labelOf(c.url) } : await resolveEmbed(c.url, "https://mytsumi.com/");
       log("fuente resuelta", c.origin || "iframe", "embed", safeUrl(c.url), "nombre", labelOf(c.url), "media final", safeUrl(primary.url), "tipo", primary.mime || mimeOf(primary.url));
