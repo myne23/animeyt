@@ -1,7 +1,7 @@
 {
   "id": "animeyt",
   "name": "AnimeYT",
-  "version": "0.1.59",
+  "version": "0.1.60",
   "apiVersion": 11,
   "entry": "plugin.js",
   "description": "Busca anime, donghua y películas subtitulados en AnimeYT.",
@@ -60,12 +60,5 @@
       "sha256": "25ac76ca9d51e5ebb1b32ce4d4c2364152ea35b7c62b05f4d3e72d5e6a256fe3",
       "label": "Kino Resolvers 1.0.1"
     }
-  },
-  "settings": [
-    {
-      "key": "installResolver",
-      "label": "Obtener Kino Resolvers",
-      "type": "action"
-    }
-  ]
+  }
 }
